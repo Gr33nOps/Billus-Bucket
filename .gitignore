@@ -1,0 +1,6 @@
+.vs/
+*.zip
+*.eps
+*.jpg
+bin/
+obj/
