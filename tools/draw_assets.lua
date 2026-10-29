@@ -1,4 +1,4 @@
--- Billu Ki Balti: authored pixel shapes, drawn directly in Aseprite.
+-- Billu's Bucket: authored pixel shapes, drawn directly in Aseprite.
 -- Run with aseprite -b --script-param root=<Assets> --script tools/draw_assets.lua
 local root=app.params.root
 local C={
@@ -466,7 +466,7 @@ for f=0,3 do local a=img(20,16)
  audioIcons[#audioIcons+1]=a
 end
 saveFrames('ui-audio',audioIcons,20,16)
-print('Hand-drawn Billu Ki Balti assets exported at native dimensions.')
+print("Hand-drawn Billu's Bucket assets exported at native dimensions.")
 
 
 

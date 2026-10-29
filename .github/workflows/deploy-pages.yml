@@ -29,7 +29,7 @@ jobs:
           dotnet-version: "9.0.x"
 
       - name: Build solution (zero warnings)
-        run: dotnet build BilluKiBalti.sln -c Release -warnaserror
+        run: dotnet build BillusBucket.sln -c Release -warnaserror
 
       - name: Run gameplay, leaderboard, and difficulty checks
         run: dotnet run --project GameTests/GameTests.csproj -c Release --no-build
@@ -41,7 +41,7 @@ jobs:
       - name: Upload private build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: billu-ki-balti-web
+          name: billus-bucket-web
           path: dist/pages/
 
       - name: Check if GitHub Pages is enabled for this repository

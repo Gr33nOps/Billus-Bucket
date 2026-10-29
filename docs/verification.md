@@ -22,4 +22,4 @@ Windows Computer Use reported `FrameArrived timed out` / `window capture timed o
 
 ## Cleanup
 
-Source is grouped by responsibility; note values and rarity have one catalog. Historical experiments and generated outputs were moved outside the workspace to the sibling BilluKiBalti-Backups folder. Current builds use only the current project and character names. Personal bests were copied byte-for-byte to the BilluKiBalti application-data folder before updating the runtime path.
+Source is grouped by responsibility; note values and rarity have one catalog. Historical experiments and generated outputs were moved outside the workspace to the sibling BillusBucket-Backups folder. Current builds use only the current project and character names. Personal bests were copied byte-for-byte to the BillusBucket application-data folder before updating the runtime path.

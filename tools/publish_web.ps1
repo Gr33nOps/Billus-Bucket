@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$webProject = Join-Path $repoRoot "BilluKiBalti.Web\BilluKiBalti.Web.csproj"
+$webProject = Join-Path $repoRoot "BillusBucket.Web\BillusBucket.Web.csproj"
 
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Join-Path $repoRoot "dist\$Platform"
@@ -24,7 +24,7 @@ if (Test-Path $OutputDir) {
     Remove-Item -Recurse -Force $OutputDir
 }
 
-Write-Host "Publishing BilluKiBalti.Web (Release) for platform '$Platform'..."
+Write-Host "Publishing BillusBucket.Web (Release) for platform '$Platform'..."
 dotnet publish $webProject -c Release -o $publishTemp
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
@@ -62,7 +62,7 @@ Set-Content -Path $configPath -Value $configJs -NoNewline -Encoding UTF8
 Write-Host "Static browser bundle ready at: $OutputDir"
 
 if ($CreateZip) {
-    $zipPath = Join-Path (Split-Path -Parent $OutputDir) "billu-ki-balti-$Platform.zip"
+    $zipPath = Join-Path (Split-Path -Parent $OutputDir) "billus-bucket-$Platform.zip"
     if (Test-Path $zipPath) {
         Remove-Item -Force $zipPath
     }

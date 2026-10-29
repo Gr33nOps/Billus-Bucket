@@ -17,14 +17,14 @@ The active art is hand-authored in `tools/draw_assets.lua` with Aseprite pixel p
 | ui-button | 68 × 18 | Normal and hover frames |
 | ui-audio | 20 × 16 | Music on/off, effects on/off |
 
-Editable files are in `BilluKiBalti/Assets/Sources`. `billu-body`, `cash-sheet`, and `ui-font` are construction/reference sources; they do not ship unused runtime PNGs. The font itself is drawn by `Presentation/PixelFont.cs`.
+Editable files are in `BillusBucket/Assets/Sources`. `billu-body`, `cash-sheet`, and `ui-font` are construction/reference sources; they do not ship unused runtime PNGs. The font itself is drawn by `Presentation/PixelFont.cs`.
 
 ## Rebuild in Aseprite
 
 Run from the repository root, replacing the executable path with your Aseprite installation:
 
 ```powershell
-$assetRoot = (Resolve-Path BilluKiBalti/Assets).Path.Replace('\', '/')
+$assetRoot = (Resolve-Path BillusBucket/Assets).Path.Replace('\', '/')
 & 'D:\aseprite\build\bin\aseprite.exe' -b --script-param "root=$assetRoot" --script tools/draw_assets.lua
 ```
 

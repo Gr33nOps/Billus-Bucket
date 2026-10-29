@@ -2,11 +2,11 @@
 
 ## 1. MonoGame & Browser Architecture
 
-- **Desktop target (`BilluKiBalti/BilluKiBalti.csproj`)**: Uses `MonoGame.Framework.DesktopGL` (`3.8.*`) on `net8.0`. DesktopGL depends on native SDL2 and OpenAL binaries, so it cannot compile directly to `browser-wasm`.
-- **Browser WebAssembly target (`BilluKiBalti.Web/BilluKiBalti.Web.csproj`)**: Uses **KNI BlazorGL** (`nkast.Kni.Platform.Blazor.GL` `4.3.9001` on `Microsoft.NET.Sdk.BlazorWebAssembly`), which implements the exact `Microsoft.Xna.Framework.*` APIs on WebGL and WebAudio.
+- **Desktop target (`BillusBucket/BillusBucket.csproj`)**: Uses `MonoGame.Framework.DesktopGL` (`3.8.*`) on `net8.0`. DesktopGL depends on native SDL2 and OpenAL binaries, so it cannot compile directly to `browser-wasm`.
+- **Browser WebAssembly target (`BillusBucket.Web/BillusBucket.Web.csproj`)**: Uses **KNI BlazorGL** (`nkast.Kni.Platform.Blazor.GL` `4.3.9001` on `Microsoft.NET.Sdk.BlazorWebAssembly`), which implements the exact `Microsoft.Xna.Framework.*` APIs on WebGL and WebAudio.
 - **Single-source-of-truth gameplay & assets**:
-  - `BilluKiBalti.Web` compiles the exact same C# gameplay, physics, animation, audio, UI, and leaderboard source files from `BilluKiBalti/` without duplicating code.
-  - All 10 PNG sprites and 8 WAV sounds in `BilluKiBalti/Assets/` are synced automatically into `wwwroot/Assets/` at build time and preloaded asynchronously into `InMemoryAssetStreamProvider` before `BilluKiBaltiGame` starts.
+  - `BillusBucket.Web` compiles the exact same C# gameplay, physics, animation, audio, UI, and leaderboard source files from `BillusBucket/` without duplicating code.
+  - All 10 PNG sprites and 8 WAV sounds in `BillusBucket/Assets/` are synced automatically into `wwwroot/Assets/` at build time and preloaded asynchronously into `InMemoryAssetStreamProvider` before `BillusBucketGame` starts.
   - The native `320×180` pixel-art `RenderTarget2D` is scaled to the largest centered `16:9` frame inside any browser or mobile viewport using `SamplerState.PointClamp` (nearest-neighbor filtering), preserving crisp square pixels and mapping mouse/touch coordinates 1:1.
 
 ---
@@ -23,9 +23,9 @@ Core gameplay depends only on `ILeaderboardService` and `IGamePlatformBridge`. `
 | `"poki"` | `PokiLeaderboardService` | **Zero external network requests by default** (`pokiApprovedExternalLeaderboardEnabled: false`) to comply with Poki's strict Content-Security-Policy (CSP). Enables the shared online backend **only** when `pokiApprovedExternalLeaderboardEnabled: true` after Poki approves your domain and Privacy Policy. |
 
 ### Bomb-Hit Scoring & Single-Submission Guarantee
-1. When a bomb hits Billu's bucket, `BilluKiBaltiRun.HitBomb()` resets active bucket cash (`run.Cash`) to `0`, updates `BestCash`, and returns the exact **pre-explosion cash** earned during that run (`lastRunCash`).
+1. When a bomb hits Billu's bucket, `BillusBucketRun.HitBomb()` resets active bucket cash (`run.Cash`) to `0`, updates `BestCash`, and returns the exact **pre-explosion cash** earned during that run (`lastRunCash`).
 2. `StartRun()` mints a fresh `currentRunId` (`Guid`).
-3. `HandleBombHit()` submits `lastRunCash` with `currentRunId` at most once (`hasSubmittedCurrentRun` guard in `BilluKiBaltiGame`, backed by a `HashSet<string>` `runId` guard in every `ILeaderboardService` implementation and a `run_id_hash` primary key in Supabase).
+3. `HandleBombHit()` submits `lastRunCash` with `currentRunId` at most once (`hasSubmittedCurrentRun` guard in `BillusBucketGame`, backed by a `HashSet<string>` `runId` guard in every `ILeaderboardService` implementation and a `run_id_hash` primary key in Supabase).
 
 ---
 
@@ -69,14 +69,14 @@ pwsh ./tools/publish_web.ps1 -Platform poki -CreateZip
 Output folders and upload-ready `.zip` archives are written to `dist/`.
 
 ### CrazyGames Pre-Submission Checklist
-1. Upload `dist/billu-ki-balti-crazygames.zip` to the CrazyGames Developer Portal and test in their QA tool (`SDK.init`, `game.loadingStart`/`loadingStop`, `game.gameplayStart`/`gameplayStop` are already wired).
+1. Upload `dist/billus-bucket-crazygames.zip` to the CrazyGames Developer Portal and test in their QA tool (`SDK.init`, `game.loadingStart`/`loadingStop`, `game.gameplayStart`/`gameplayStop` are already wired).
 2. **Native Weekly Leaderboard (invite-only)**:
    - CrazyGames grants native leaderboards by invitation (max 1 weekly leaderboard per game).
    - Until invited, keep `crazyGamesLeaderboardEnabled: false` in `wwwroot/platform-config.js`; the game automatically uses local Personal Best without claiming native leaderboard access.
    - Once invited, copy the base64 AES-GCM encryption key from the CrazyGames Developer Portal into `crazyGamesEncryptionKeyBase64`, set `crazyGamesLeaderboardEnabled: true`, and re-run `pwsh ./tools/publish_web.ps1 -Platform crazygames -CreateZip`. (Never place a server-side REST `X-API-Key` in client files.)
 
 ### Poki Pre-Submission Checklist
-1. Keep `pokiApprovedExternalLeaderboardEnabled: false` and `sharedLeaderboardEnabled: false` for your initial Poki upload (`dist/billu-ki-balti-poki.zip`). In this default configuration, the game makes **zero** external network requests and complies 100% with Poki's CSP and External Resources Policy.
+1. Keep `pokiApprovedExternalLeaderboardEnabled: false` and `sharedLeaderboardEnabled: false` for your initial Poki upload (`dist/billus-bucket-poki.zip`). In this default configuration, the game makes **zero** external network requests and complies 100% with Poki's CSP and External Resources Policy.
 2. Verify in Poki's Inspector that `gameLoadingFinished`, `gameplayStart`, and `gameplayStop` fire cleanly without consecutive duplicates (enforced by `PlatformLifecycleGuard`).
 3. **Optional External Weekly Leaderboard on Poki (requires approval first)**:
    - Deploy `backend/supabase/schema.sql` and `backend/supabase/functions/leaderboard/index.ts` to your Supabase project.
@@ -95,12 +95,12 @@ Verifies gameplay scoring, pre-explosion bomb score capture, once-per-run submis
 
 ### B. Desktop Build
 ```powershell
-dotnet run --project BilluKiBalti/BilluKiBalti.csproj
+dotnet run --project BillusBucket/BillusBucket.csproj
 ```
 
 ### C. Browser Build (Desktop, Mobile Touch & Restricted Storage)
 ```powershell
-dotnet run --project BilluKiBalti.Web/BilluKiBalti.Web.csproj
+dotnet run --project BillusBucket.Web/BillusBucket.Web.csproj
 ```
 Open the local URL printed by `dotnet run` (or serve `dist/local` with any static HTTP server):
 1. **Desktop controls**: Test `Left`/`Right` or `A`/`D`, mouse click-and-drag, `P`/`Esc` pause, `M` mute, `L` or `LEADERBOARD` button on Ready and Game-Over screens, and `PLAY AGAIN` immediate restart after bomb explosion.

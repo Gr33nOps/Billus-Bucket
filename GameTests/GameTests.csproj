@@ -8,25 +8,25 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="DifficultyChecks.cs" />
-    <Compile Include="..\BilluKiBalti\Gameplay\NoteCatalog.cs" Link="NoteCatalog.cs" />
-    <Compile Include="..\BilluKiBalti\Gameplay\DropDirector.cs" Link="DropDirector.cs" />
-    <Compile Include="..\BilluKiBalti\Gameplay\BilluKiBaltiRun.cs" Link="BilluKiBaltiRun.cs" />
-    <Compile Include="..\BilluKiBalti\Gameplay\DropMotion.cs" Link="DropMotion.cs" />
-    <Compile Include="..\BilluKiBalti\Gameplay\Drop.cs" Link="Drop.cs" />
-    <Compile Include="..\BilluKiBalti\Gameplay\BucketControl.cs" Link="BucketControl.cs" />
-    <Compile Include="..\BilluKiBalti\Persistence\LeaderboardStore.cs" Link="LeaderboardStore.cs" />
-    <Compile Include="..\BilluKiBalti\Presentation\CashDisplay.cs" Link="CashDisplay.cs" />
-    <Compile Include="..\BilluKiBalti\Gameplay\RoundFlow.cs" Link="RoundFlow.cs" />
-    <Compile Include="..\BilluKiBalti\Gameplay\BilluAnimator.cs" Link="BilluAnimator.cs" />
-    <Compile Include="..\BilluKiBalti\Platform\IGamePlatformBridge.cs" Link="IGamePlatformBridge.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\LeaderboardModels.cs" Link="LeaderboardModels.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\ILocalScoreStorage.cs" Link="ILocalScoreStorage.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\ILeaderboardService.cs" Link="ILeaderboardService.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\LocalLeaderboardService.cs" Link="LocalLeaderboardService.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\ISharedLeaderboardTransport.cs" Link="ISharedLeaderboardTransport.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\SharedOnlineLeaderboardService.cs" Link="SharedOnlineLeaderboardService.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\CrazyGamesLeaderboardService.cs" Link="CrazyGamesLeaderboardService.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\PokiLeaderboardService.cs" Link="PokiLeaderboardService.cs" />
-    <Compile Include="..\BilluKiBalti\Leaderboards\LeaderboardServiceFactory.cs" Link="LeaderboardServiceFactory.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\NoteCatalog.cs" Link="NoteCatalog.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\DropDirector.cs" Link="DropDirector.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\BillusBucketRun.cs" Link="BillusBucketRun.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\DropMotion.cs" Link="DropMotion.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\Drop.cs" Link="Drop.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\BucketControl.cs" Link="BucketControl.cs" />
+    <Compile Include="..\BillusBucket\Persistence\LeaderboardStore.cs" Link="LeaderboardStore.cs" />
+    <Compile Include="..\BillusBucket\Presentation\CashDisplay.cs" Link="CashDisplay.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\RoundFlow.cs" Link="RoundFlow.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\BilluAnimator.cs" Link="BilluAnimator.cs" />
+    <Compile Include="..\BillusBucket\Platform\IGamePlatformBridge.cs" Link="IGamePlatformBridge.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\LeaderboardModels.cs" Link="LeaderboardModels.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\ILocalScoreStorage.cs" Link="ILocalScoreStorage.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\ILeaderboardService.cs" Link="ILeaderboardService.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\LocalLeaderboardService.cs" Link="LocalLeaderboardService.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\ISharedLeaderboardTransport.cs" Link="ISharedLeaderboardTransport.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\SharedOnlineLeaderboardService.cs" Link="SharedOnlineLeaderboardService.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\CrazyGamesLeaderboardService.cs" Link="CrazyGamesLeaderboardService.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\PokiLeaderboardService.cs" Link="PokiLeaderboardService.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\LeaderboardServiceFactory.cs" Link="LeaderboardServiceFactory.cs" />
   </ItemGroup>
 </Project>

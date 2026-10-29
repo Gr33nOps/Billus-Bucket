@@ -4,7 +4,7 @@ using System.IO;
 using System.Net.Http;
 using System.Numerics;
 using System.Threading.Tasks;
-using BilluKiBalti;
+using BillusBucket;
 
 namespace GameTests
 {
@@ -30,7 +30,7 @@ namespace GameTests
             TestPlatformLifecycleGuard();
             TestEdgeCaseSafety();
 
-            Console.WriteLine("Billu Ki Balti gameplay, platform SDK, and leaderboard checks passed.");
+            Console.WriteLine("Billu's Bucket gameplay, platform SDK, and leaderboard checks passed.");
             DifficultyChecks.Run();
         }
 
@@ -64,7 +64,7 @@ namespace GameTests
 
         private static void TestRunScoring()
         {
-            BilluKiBaltiRun rupees = new BilluKiBaltiRun();
+            BillusBucketRun rupees = new BillusBucketRun();
             foreach (int denomination in new[] { 10, 20, 50, 100, 500, 1000, 5000 })
             {
                 rupees.CatchCash(denomination);
@@ -73,7 +73,7 @@ namespace GameTests
             Equal("6680", rupees.Cash.ToString(), "mixed rupee denominations award their own value");
             Equal("6680", rupees.HitBomb().ToString(), "rupee run total survives in game-over summary");
 
-            BilluKiBaltiRun run = new BilluKiBaltiRun();
+            BillusBucketRun run = new BillusBucketRun();
             Equal("10", run.CatchCash().ToString(), "one cash catch earns ten rupees");
             Equal("20", run.CatchCash().ToString(), "two catches total twenty rupees");
             Equal("30", run.CatchCash().ToString(), "third note keeps its current value");
@@ -100,7 +100,7 @@ namespace GameTests
             Equal("120", run.BestCash.ToString(), "retry keeps best score");
             Equal("10", run.CatchCash().ToString(), "retry resets note value to ten rupees");
 
-            BilluKiBaltiRun endless = new BilluKiBaltiRun();
+            BillusBucketRun endless = new BillusBucketRun();
             for (int i = 0; i < 2840; i++)
             {
                 endless.CatchCash();
@@ -435,7 +435,7 @@ namespace GameTests
 
         private static void TestLeaderboardStore()
         {
-            string folder = Path.Combine(Path.GetTempPath(), "billu-ki-balti-tests-" + Guid.NewGuid());
+            string folder = Path.Combine(Path.GetTempPath(), "billus-bucket-tests-" + Guid.NewGuid());
             try
             {
                 string file = Path.Combine(folder, "scores.json");
@@ -533,7 +533,7 @@ namespace GameTests
                 sourcePlatform: "web");
 
             // Simulate catching rupees and then hitting a bomb (wiping run.Cash to 0 while returning pre-explosion cash)
-            BilluKiBaltiRun run = new BilluKiBaltiRun();
+            BillusBucketRun run = new BillusBucketRun();
             run.CatchCash(500);
             run.CatchCash(1000);
             BigInteger preExplosionCash = run.HitBomb();

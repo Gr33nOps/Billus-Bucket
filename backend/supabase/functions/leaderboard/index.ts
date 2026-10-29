@@ -1,5 +1,5 @@
 // ============================================================================
-// Billu Ki Balti — Supabase Edge Function: /functions/v1/leaderboard
+// Billu's Bucket — Supabase Edge Function: /functions/v1/leaderboard
 // ============================================================================
 // Required server-only environment secrets (set via `supabase secrets set`):
 //   SUPABASE_URL               (auto-injected by Supabase)

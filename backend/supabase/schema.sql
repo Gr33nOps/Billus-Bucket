@@ -1,5 +1,5 @@
 -- ============================================================================
--- Billu Ki Balti — Optional Shared Weekly Leaderboard Schema (Supabase/Postgres)
+-- Billu's Bucket — Optional Shared Weekly Leaderboard Schema (Supabase/Postgres)
 -- ============================================================================
 -- Security model:
 -- 1. Row-Level Security (RLS) is ENABLED on every table with NO public/anon write policies.

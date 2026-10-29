@@ -12,7 +12,7 @@ import sys
 import wave
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "BilluKiBalti/Assets/Audio"
+OUT = ROOT / "BillusBucket/Assets/Audio"
 RATE = 22050
 BPM = 104
 BEAT = 60 / BPM
