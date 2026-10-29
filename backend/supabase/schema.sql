@@ -15,9 +15,8 @@ returns timestamptz
 language sql
 immutable
 as $$
-    select date_trunc('week', ts at time zone 'UTC' - interval '9 hours')
-           + interval '9 hours'
-           at time zone 'UTC';
+    select (date_trunc('week', (ts at time zone 'UTC') - interval '9 hours')
+           + interval '9 hours') at time zone 'UTC';
 $$;
 
 -- 1. Weekly best score per anonymous player

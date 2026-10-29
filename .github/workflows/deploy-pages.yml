@@ -38,6 +38,12 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install database test runtime
+        run: npm ci --prefix GameTests
+
+      - name: Check leaderboard SQL in PostgreSQL
+        run: node --test GameTests/leaderboard-sql.test.cjs
+
       - name: Check browser failure handling
         run: node --test GameTests/platform-bridge.test.cjs
 
