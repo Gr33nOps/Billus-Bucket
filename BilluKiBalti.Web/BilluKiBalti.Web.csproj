@@ -1,0 +1,79 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>BilluKiBalti.Web</RootNamespace>
+    <AssemblyName>BilluKiBalti.Web</AssemblyName>
+    <DefineConstants>$(DefineConstants);BLAZORGL</DefineConstants>
+    <KniPlatform>BlazorGL</KniPlatform>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.*" PrivateAssets="all" />
+    <PackageReference Include="nkast.Xna.Framework" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Content" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Media" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Input" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Game" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Devices" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Storage" Version="4.3.9001" />
+    <PackageReference Include="nkast.Xna.Framework.XR" Version="4.3.9001" />
+    <PackageReference Include="nkast.Kni.Platform.Blazor.GL" Version="4.3.9001" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WebAssembly host files -->
+    <Compile Include="Program.cs" />
+    <Compile Include="Pages\Index.razor.cs" />
+    <Compile Include="Platform\BrowserPlatformInterop.cs" />
+
+    <!-- Shared Billu Ki Balti C# gameplay, presentation, audio, and leaderboard source -->
+    <Compile Include="..\BilluKiBalti\BilluKiBaltiGame.cs" Link="Shared\BilluKiBaltiGame.cs" />
+    <Compile Include="..\BilluKiBalti\Audio\GameAudio.cs" Link="Shared\Audio\GameAudio.cs" />
+    <Compile Include="..\BilluKiBalti\Diagnostics\ReviewTools.cs" Link="Shared\Diagnostics\ReviewTools.cs" />
+    <Compile Include="..\BilluKiBalti\Gameplay\BilluAnimator.cs" Link="Shared\Gameplay\BilluAnimator.cs" />
+    <Compile Include="..\BilluKiBalti\Gameplay\BilluKiBaltiRun.cs" Link="Shared\Gameplay\BilluKiBaltiRun.cs" />
+    <Compile Include="..\BilluKiBalti\Gameplay\BucketControl.cs" Link="Shared\Gameplay\BucketControl.cs" />
+    <Compile Include="..\BilluKiBalti\Gameplay\Drop.cs" Link="Shared\Gameplay\Drop.cs" />
+    <Compile Include="..\BilluKiBalti\Gameplay\DropDirector.cs" Link="Shared\Gameplay\DropDirector.cs" />
+    <Compile Include="..\BilluKiBalti\Gameplay\DropMotion.cs" Link="Shared\Gameplay\DropMotion.cs" />
+    <Compile Include="..\BilluKiBalti\Gameplay\NoteCatalog.cs" Link="Shared\Gameplay\NoteCatalog.cs" />
+    <Compile Include="..\BilluKiBalti\Gameplay\RoundFlow.cs" Link="Shared\Gameplay\RoundFlow.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\CrazyGamesLeaderboardService.cs" Link="Shared\Leaderboards\CrazyGamesLeaderboardService.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\ILeaderboardService.cs" Link="Shared\Leaderboards\ILeaderboardService.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\ILocalScoreStorage.cs" Link="Shared\Leaderboards\ILocalScoreStorage.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\ISharedLeaderboardTransport.cs" Link="Shared\Leaderboards\ISharedLeaderboardTransport.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\LeaderboardModels.cs" Link="Shared\Leaderboards\LeaderboardModels.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\LeaderboardServiceFactory.cs" Link="Shared\Leaderboards\LeaderboardServiceFactory.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\LocalLeaderboardService.cs" Link="Shared\Leaderboards\LocalLeaderboardService.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\PokiLeaderboardService.cs" Link="Shared\Leaderboards\PokiLeaderboardService.cs" />
+    <Compile Include="..\BilluKiBalti\Leaderboards\SharedOnlineLeaderboardService.cs" Link="Shared\Leaderboards\SharedOnlineLeaderboardService.cs" />
+    <Compile Include="..\BilluKiBalti\Persistence\LeaderboardStore.cs" Link="Shared\Persistence\LeaderboardStore.cs" />
+    <Compile Include="..\BilluKiBalti\Platform\IAssetStreamProvider.cs" Link="Shared\Platform\IAssetStreamProvider.cs" />
+    <Compile Include="..\BilluKiBalti\Platform\IGamePlatformBridge.cs" Link="Shared\Platform\IGamePlatformBridge.cs" />
+    <Compile Include="..\BilluKiBalti\Presentation\CashDisplay.cs" Link="Shared\Presentation\CashDisplay.cs" />
+    <Compile Include="..\BilluKiBalti\Presentation\PixelArt.cs" Link="Shared\Presentation\PixelArt.cs" />
+    <Compile Include="..\BilluKiBalti\Presentation\PixelFont.cs" Link="Shared\Presentation\PixelFont.cs" />
+    <Compile Include="..\BilluKiBalti\Presentation\VisualEffects.cs" Link="Shared\Presentation\VisualEffects.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <SharedPngAssets Include="..\BilluKiBalti\Assets\*.png" />
+    <SharedWavAssets Include="..\BilluKiBalti\Assets\Audio\*.wav" />
+  </ItemGroup>
+
+  <!-- Mirror single-source-of-truth PNG and WAV assets into wwwroot/Assets before StaticWebAssets discovery -->
+  <Target Name="SyncSharedGameAssets" BeforeTargets="BeforeBuild;ResolveProjectStaticWebAssets">
+    <Copy SourceFiles="@(SharedPngAssets)" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\Assets" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(SharedWavAssets)" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\Assets\Audio" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

@@ -1,6 +1,10 @@
 .vs/
-*.zip
-*.eps
-*.jpg
 bin/
 obj/
+__pycache__/
+*.pyc
+art/review/
+art/live-review/
+*.log
+dist/
+BilluKiBalti.Web/wwwroot/Assets/
