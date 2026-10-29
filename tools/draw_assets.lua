@@ -157,7 +157,9 @@ local function billu(side,step,burn)
  else
   poly(a,{{5,15},{7,16},{5,22},{3,24},{1,23},{2,19}},'ink')
   poly(a,{{18,15},{20,16},{22,22},{21,24},{19,23},{17,19}},'ink')
-  rect(a,3,17,3,3,'teal');rect(a,18,17,3,3,'teal')
+  -- Both lowered sleeves need a continuous dark shoulder edge.
+  rect(a,3,17,3,3,'ink');rect(a,4,18,2,2,'teal')
+  rect(a,18,17,3,3,'ink');rect(a,18,18,2,2,'teal')
   rect(a,2,20,3,3,'soot');rect(a,19,20,3,3,'soot');px(a,2,20,'ash');px(a,20,20,'ash')
  end
  -- face and hair (black tousled hair, warm face, big eyebrows)
@@ -166,6 +168,12 @@ local function billu(side,step,burn)
  rect(a,4,9,2,3,skin);rect(a,18,9,2,3,skin);rect(a,7,6,9,7,light)
  poly(a,{{4,6},{5,3},{8,3},{10,2},{14,3},{17,3},{19,5},{19,8},{17,8},{16,5},{13,6},{12,5},{9,6},{7,5},{6,8},{4,8}},'ink')
  line(a,7,4,10,3,'hairlight');line(a,12,4,16,4,'hair');px(a,17,5,'hairlight')
+ -- The ears previously painted over the inner arm contour, merging both shapes.
+ if not burn and not side then
+  line(a,4,9,4,11,'ink');line(a,19,9,19,11,'ink')
+  px(a,5,12,'ink');px(a,18,12,'ink')
+  line(a,3,9,3,11,'skinshade');line(a,20,9,20,11,'skinshade')
+ end
  if side then
   rect(a,13,7,3,1,'skinshade');rect(a,12,9,4,2,'white');rect(a,15,9,1,2,'ink')
   px(a,18,11,skin);px(a,19,11,light);px(a,11,10,'skinshade')
