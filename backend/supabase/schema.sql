@@ -185,3 +185,22 @@ $$;
 revoke all on function public.check_leaderboard_rate_limit(text, integer) from public, anon, authenticated;
 revoke all on function public.upsert_weekly_best_score(text, text, bigint, text) from public, anon, authenticated;
 revoke all on function public.get_weekly_leaderboard_snapshot(text, integer) from public, anon, authenticated;
+
+-- Keep replay protection and score storage in the same database transaction.
+create or replace function public.submit_weekly_run(
+    p_run_id_hash text, p_player_hash text, p_display_name text,
+    p_score bigint, p_source_platform text
+)
+returns void language plpgsql security definer set search_path = public
+as $$
+begin
+    insert into public.leaderboard_submitted_runs(run_id_hash, player_hash, score)
+    values(p_run_id_hash, p_player_hash, p_score);
+    perform public.upsert_weekly_best_score(p_player_hash, p_display_name, p_score, p_source_platform);
+end;
+$$;
+revoke all on function public.submit_weekly_run(text, text, text, bigint, text) from public, anon, authenticated;
+grant execute on function public.submit_weekly_run(text, text, text, bigint, text) to service_role;
+grant execute on function public.check_leaderboard_rate_limit(text, integer) to service_role;
+grant execute on function public.upsert_weekly_best_score(text, text, bigint, text) to service_role;
+grant execute on function public.get_weekly_leaderboard_snapshot(text, integer) to service_role;

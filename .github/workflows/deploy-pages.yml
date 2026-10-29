@@ -34,6 +34,20 @@ jobs:
       - name: Run gameplay, leaderboard, and difficulty checks
         run: dotnet run --project GameTests/GameTests.csproj -c Release --no-build
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check browser failure handling
+        run: node --test GameTests/platform-bridge.test.cjs
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Check leaderboard backend
+        run: deno test --allow-env --allow-net backend/supabase/functions/leaderboard/index_test.ts
+
       - name: Publish browser WebAssembly bundle
         shell: pwsh
         run: ./tools/publish_web.ps1 -Platform web -OutputDir dist/pages
@@ -53,7 +67,8 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "GitHub Pages is not enabled yet on this repository (skipping Pages deploy step)."
+            echo "::error::GitHub Pages is unavailable. Enable Pages with GitHub Actions in repository settings; private repositories require a supported plan."
+            exit 1
           fi
 
       - name: Upload GitHub Pages artifact

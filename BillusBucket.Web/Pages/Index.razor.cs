@@ -21,29 +21,37 @@ namespace BillusBucket.Web.Pages
                 return;
             }
 
-            platformBridge = new BrowserJsPlatformBridge(JsRuntime);
-            await platformBridge.InitializeAsync();
-            platformBridge.NotifyLoadingStarted();
-
-            preloadedAssets = await PreloadGameAssetsAsync();
-
-            BrowserLocalScoreStorage localStorage = new BrowserLocalScoreStorage(
-                JsRuntime,
-                platformBridge.State.PersistentStorageAvailable);
-            BrowserCrazyGamesSdkClient crazyGamesClient = new BrowserCrazyGamesSdkClient(
-                JsRuntime,
-                platformBridge);
-
-            leaderboardService = LeaderboardServiceFactory.Create(
-                platformBridge.State.ToRuntimeConfig(),
-                localStorage,
-                crazyGamesClient,
-                Http);
-
-            dotNetRef = DotNetObjectReference.Create(this);
-            bootCompleted = true;
-
-            await JsRuntime.InvokeVoidAsync("billuPlatform.startRenderLoop", dotNetRef);
+            try
+            {
+                platformBridge = new BrowserJsPlatformBridge(JsRuntime);
+                await platformBridge.InitializeAsync();
+                platformBridge.NotifyLoadingStarted();
+    
+                preloadedAssets = await PreloadGameAssetsAsync();
+    
+                BrowserLocalScoreStorage localStorage = new BrowserLocalScoreStorage(
+                    JsRuntime,
+                    platformBridge.State.PersistentStorageAvailable);
+                BrowserCrazyGamesSdkClient crazyGamesClient = new BrowserCrazyGamesSdkClient(
+                    JsRuntime,
+                    platformBridge);
+    
+                leaderboardService = LeaderboardServiceFactory.Create(
+                    platformBridge.State.ToRuntimeConfig(),
+                    localStorage,
+                    crazyGamesClient,
+                    Http);
+    
+                dotNetRef = DotNetObjectReference.Create(this);
+                bootCompleted = true;
+    
+                await JsRuntime.InvokeVoidAsync("billuPlatform.startRenderLoop", dotNetRef);
+            }
+            catch (Exception error)
+            {
+                bootCompleted = false;
+                await JsRuntime.InvokeVoidAsync("billuPlatform.showFatalError", error.Message);
+            }
         }
 
         [JSInvokable]

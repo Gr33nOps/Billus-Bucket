@@ -320,12 +320,24 @@
         canvas.style.height = viewH + "px";
     }
 
+    function showFatalError(error) {
+        renderLoopRunning = false;
+        dotNetInstance = null;
+        externalAudioMuted = true;
+        console.error("Game stopped:", error);
+        const overlay = document.getElementById("loadingOverlay");
+        if (overlay) overlay.style.display = "none";
+        const message = document.getElementById("blazor-error-ui");
+        if (message) message.style.display = "block";
+    }
+
     function tickAnimationFrame() {
-        if (dotNetInstance) {
-            try {
-                dotNetInstance.invokeMethod("TickDotNet");
-            } catch (_err) {
-            }
+        if (!renderLoopRunning) return;
+        try {
+            if (dotNetInstance) dotNetInstance.invokeMethod("TickDotNet");
+        } catch (error) {
+            showFatalError(error);
+            return;
         }
         window.requestAnimationFrame(tickAnimationFrame);
     }
@@ -379,6 +391,7 @@
         storageGet: storageGet,
         storageSet: storageSet,
         startRenderLoop: startRenderLoop,
+        showFatalError: showFatalError,
         isExternalAudioMuted: isExternalAudioMuted,
         syncResponsiveCanvasLayout: syncResponsiveCanvasLayout
     };

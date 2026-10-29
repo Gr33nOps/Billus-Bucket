@@ -76,7 +76,7 @@ Output folders and upload-ready `.zip` archives are written to `dist/`.
    - Once invited, copy the base64 AES-GCM encryption key from the CrazyGames Developer Portal into `crazyGamesEncryptionKeyBase64`, set `crazyGamesLeaderboardEnabled: true`, and re-run `pwsh ./tools/publish_web.ps1 -Platform crazygames -CreateZip`. (Never place a server-side REST `X-API-Key` in client files.)
 
 ### Poki Pre-Submission Checklist
-1. Keep `pokiApprovedExternalLeaderboardEnabled: false` and `sharedLeaderboardEnabled: false` for your initial Poki upload (`dist/billus-bucket-poki.zip`). In this default configuration, the game makes **zero** external network requests and complies 100% with Poki's CSP and External Resources Policy.
+1. Keep `pokiApprovedExternalLeaderboardEnabled: false` and `sharedLeaderboardEnabled: false` for your initial Poki upload (`dist/billus-bucket-poki.zip`). In this default configuration, the game makes no external leaderboard requests. The official Poki SDK still loads externally. Portal Inspector testing and approval remain required.
 2. Verify in Poki's Inspector that `gameLoadingFinished`, `gameplayStart`, and `gameplayStop` fire cleanly without consecutive duplicates (enforced by `PlatformLifecycleGuard`).
 3. **Optional External Weekly Leaderboard on Poki (requires approval first)**:
    - Deploy `backend/supabase/schema.sql` and `backend/supabase/functions/leaderboard/index.ts` to your Supabase project.
@@ -106,3 +106,11 @@ Open the local URL printed by `dotnet run` (or serve `dist/local` with any stati
 1. **Desktop controls**: Test `Left`/`Right` or `A`/`D`, mouse click-and-drag, `P`/`Esc` pause, `M` mute, `L` or `LEADERBOARD` button on Ready and Game-Over screens, and `PLAY AGAIN` immediate restart after bomb explosion.
 2. **Mobile touch & responsive 16:9**: Open Chrome DevTools (`F12` → Device Toolbar `Ctrl+Shift+M`), switch between mobile landscape (`844×390`) and portrait (`390×844`), verify crisp nearest-neighbor pixel scaling and touch-drag bucket movement.
 3. **Restricted / blocked browser storage**: Append `?restrictedStorage=1` on `localhost` (e.g. `http://localhost:5000/?restrictedStorage=1`). Verify the game boots, plays, tracks Personal Best for the active session, and displays `"SESSION ONLY - STORAGE RESTRICTED"` on the Leaderboard screen without console errors.
+
+## Audit status (2026-10-30)
+- GitHub Actions builds succeed, but Pages was never enabled. GitHub initially rejected enabling it on the private repository. With the owner's approval, CASH is now public and Pages is enabled using Actions. A green build previously skipped deployment silently; deployment now fails explicitly when unavailable.
+- Local static-host browser boot, gameplay, pause, mobile portrait, blocked storage and missing-asset recovery were checked. The live Pages URL is https://gr33nops.github.io/CASH/.
+- Shared rankings remain disabled until a Supabase project is configured and schema/functions are deployed. Set a unique PLAYER_HASH_SALT of at least 32 characters. Reapply schema.sql before deploying the updated atomic submission function.
+- Backend tests use a mock database. Production database execution and portal-hosted leaderboard submissions still require deployment testing.
+- CrazyGames and Poki bundles are preparation, not proof of submission or acceptance. No portal submission is verified. Commercial/rewarded ad flows are not implemented; evaluate them with the portal requirements before release.
+- Official references: https://docs.crazygames.com/sdk/leaderboards-client/ and https://developers.poki.com/guide/sdk-html5.

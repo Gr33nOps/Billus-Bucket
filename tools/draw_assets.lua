@@ -58,17 +58,17 @@ saveFrames('bucket',{bucket},28,16)
 -- Inverted wreck: compressed base, crumpled side, split and bent ground-facing rim.
 local wreck=img(28,16)
 local wreckEdge={{7,1},{12,1},{14,3},{18,2},{21,3},{23,7},{22,9},{25,12},{27,13},{25,15},{3,15},{0,13},{3,11},{4,7},{6,6}}
-poly(wreck,wreckEdge,'blueshade')
-poly(wreck,{{7,4},{11,3},{14,5},{18,4},{20,5},{21,8},{19,9},{22,12},{6,12},{5,9}},'blue')
--- Broad soot patches leave recognisable blue paint, without random speckles.
-poly(wreck,{{6,5},{10,4},{11,7},{9,9},{10,12},{5,12},{4,9}},'soot')
-poly(wreck,{{17,3},{21,4},{22,8},{20,10},{17,8},{18,6}},'soot')
-line(wreck,8,2,11,2,'ash');line(wreck,12,3,14,4,'ash')
+poly(wreck,wreckEdge,0x49403e)
+poly(wreck,{{7,4},{11,3},{14,5},{18,4},{20,5},{21,8},{19,9},{22,12},{6,12},{5,9}},0x665b53)
+-- Burned paint is fully gone: warm charcoal, soot and exposed ash.
+poly(wreck,{{6,5},{10,4},{11,7},{9,9},{10,12},{5,12},{4,9}},0x332e30)
+poly(wreck,{{17,3},{21,4},{22,8},{20,10},{17,8},{18,6}},0x332e30)
+line(wreck,8,2,11,2,0x998a77);line(wreck,12,3,14,4,0x998a77)
 -- A short angular split and exposed steel on the folded panel.
 line(wreck,14,7,13,9,'ink');line(wreck,13,9,15,11,'ink')
-line(wreck,15,7,14,9,'ash')
+line(wreck,15,7,14,9,0x998a77)
 poly(wreck,{{3,11},{10,12},{14,11},{19,12},{24,11},{26,13},{24,14},{16,13},{11,14},{3,13}},'ink')
-line(wreck,3,12,8,13,'bluelight');line(wreck,17,12,22,13,'ash')
+line(wreck,3,12,8,13,0x998a77);line(wreck,17,12,22,13,0x998a77)
 contour(wreck,wreckEdge,'ink')
 saveFrames('bucket-burned',{wreck},28,16)
 

@@ -17,6 +17,25 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 }
 
 $publishTemp = Join-Path $repoRoot "dist\_publish_tmp_$Platform"
+# Resolve before deleting anything; generated bundles must remain inside this repo's dist.
+$distRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "dist"))
+$OutputDir = [IO.Path]::GetFullPath($OutputDir)
+$publishTemp = [IO.Path]::GetFullPath($publishTemp)
+foreach ($target in @($OutputDir, $publishTemp)) {
+    if (-not $target.StartsWith($distRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to replace a directory outside $distRoot : $target"
+    }
+    if (Test-Path -LiteralPath $target) {
+        $item = Get-Item -LiteralPath $target -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw "Refusing to replace a linked output directory: $target"
+        }
+    }
+}
+if ($OutputDir -eq $publishTemp -or $OutputDir.StartsWith($publishTemp + [IO.Path]::DirectorySeparatorChar) -or $publishTemp.StartsWith($OutputDir + [IO.Path]::DirectorySeparatorChar)) {
+    throw "Output and temporary publish directories must be separate."
+}
+
 if (Test-Path $publishTemp) {
     Remove-Item -Recurse -Force $publishTemp
 }
