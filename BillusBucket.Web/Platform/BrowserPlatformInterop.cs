@@ -137,6 +137,7 @@ namespace BillusBucket.Web
     public sealed class BrowserLocalScoreStorage : ILocalScoreStorage
     {
         private const string BestScoreKey = "billus_bucket.personal_best";
+        // Retain the former storage key only to migrate existing players' personal best.
         private const string LegacyBestScoreKey = "billu_ki_balti.personal_best";
         private const string PlayerIdKey = "billus_bucket.player_id";
         private const string DisplayNameKey = "billus_bucket.display_name";

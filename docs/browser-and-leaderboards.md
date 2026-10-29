@@ -108,8 +108,8 @@ Open the local URL printed by `dotnet run` (or serve `dist/local` with any stati
 3. **Restricted / blocked browser storage**: Append `?restrictedStorage=1` on `localhost` (e.g. `http://localhost:5000/?restrictedStorage=1`). Verify the game boots, plays, tracks Personal Best for the active session, and displays `"SESSION ONLY - STORAGE RESTRICTED"` on the Leaderboard screen without console errors.
 
 ## Audit status (2026-10-30)
-- GitHub Actions builds succeed, but Pages was never enabled. GitHub initially rejected enabling it on the private repository. With the owner's approval, CASH is now public and Pages is enabled using Actions. A green build previously skipped deployment silently; deployment now fails explicitly when unavailable.
-- Local static-host browser boot, gameplay, pause, mobile portrait, blocked storage and missing-asset recovery were checked. The live Pages URL is https://gr33nops.github.io/CASH/.
+- GitHub Actions builds succeed, but Pages was never enabled. GitHub initially rejected enabling it on the private repository. With the owner's approval, Billus-Bucket is now public and Pages is enabled using Actions. A green build previously skipped deployment silently; deployment now fails explicitly when unavailable.
+- Local static-host browser boot, gameplay, pause, mobile portrait, blocked storage and missing-asset recovery were checked. The live Pages URL is https://gr33nops.github.io/Billus-Bucket/.
 - Shared rankings remain disabled until a Supabase project is configured and schema/functions are deployed. Set a unique PLAYER_HASH_SALT of at least 32 characters. Reapply schema.sql before deploying the updated atomic submission function.
 - Edge Function tests mock the client; a separate PGlite/PostgreSQL test executes the actual schema and verifies rollback, replay rejection, ranking, and RPC permissions. Production Supabase and portal-hosted submissions still require deployment testing.
 - CrazyGames and Poki bundles are preparation, not proof of submission or acceptance. No portal submission is verified. Commercial/rewarded ad flows are not implemented; evaluate them with the portal requirements before release.

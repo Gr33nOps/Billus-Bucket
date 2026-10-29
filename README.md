@@ -1,5 +1,7 @@
 # Billu's Bucket
 
+[Play in your browser](https://gr33nops.github.io/Billus-Bucket/)
+
 A crisp `320×180` pixel-art rooftop arcade game built with C# and MonoGame (DesktopGL + Browser WebAssembly via KNI BlazorGL).
 
 Guide Billu across the rooftop to catch floating rupee notes (`Rs 10` to `Rs 5,000`) in his bucket while dodging falling bombs.
