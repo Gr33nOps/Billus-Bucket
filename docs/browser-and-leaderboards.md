@@ -18,7 +18,7 @@ Core gameplay depends only on `ILeaderboardService` and `IGamePlatformBridge`. `
 | `activePlatform` | Active `ILeaderboardService` | Behavior |
 |---|---|---|
 | `"local"` / `"desktop"` | `LocalLeaderboardService` | Saves Personal Best locally (`leaderboard.json` on desktop, safe `localStorage` in browser with session-memory fallback). Never displays fake global rankings. |
-| `"web"` (with `sharedLeaderboardEnabled: true`) | `SharedOnlineLeaderboardService` | Saves Personal Best locally + submits completed runs once per `runId` to the Supabase Edge Function (`/functions/v1/leaderboard`) and displays Weekly Top 10 + player weekly rank. Degrades gracefully to local mode when offline. |
+| `"web"` (with `sharedLeaderboardEnabled: true`) | `SharedOnlineLeaderboardService` | Saves Personal Best locally + submits completed runs once per `runId` to the configured shared leaderboard API (`backend/cloudflare/` Cloudflare Worker + D1 SQLite, or `backend/supabase/` Supabase Edge Function) and displays Weekly Top 10 + player weekly rank. Degrades gracefully to local mode when offline. |
 | `"crazygames"` | `CrazyGamesLeaderboardService` | Always tracks Personal Best locally. Submits AES-GCM encrypted scores via `window.CrazyGames.SDK.user.submitScore` **only** when `crazyGamesLeaderboardEnabled: true` and an encryption key is configured. Optionally pairs with the shared Top-10 backend if enabled. |
 | `"poki"` | `PokiLeaderboardService` | **Zero external network requests by default** (`pokiApprovedExternalLeaderboardEnabled: false`) to comply with Poki's strict Content-Security-Policy (CSP). Enables the shared online backend **only** when `pokiApprovedExternalLeaderboardEnabled: true` after Poki approves your domain and Privacy Policy. |
 
@@ -29,7 +29,11 @@ Core gameplay depends only on `ILeaderboardService` and `IGamePlatformBridge`. `
 
 ---
 
-## 3. Shared Online Leaderboard Evaluation (Supabase)
+## 3. Shared Online Leaderboard Backends (Cloudflare Workers + D1 or Supabase)
+
+Two drop-in server implementations are included that speak the exact same JSON protocol (`GET ?limit=10&playerId=...` and `POST { runId, playerId, displayName, score, durationSeconds, platform }`):
+- **Recommended free non-pausing backend (`backend/cloudflare/`)**: **Cloudflare Workers + Cloudflare D1 (SQLite)**. Requires no credit card, never auto-pauses when idle, needs zero client API keys (`sharedLeaderboardPublicKey: ""`), and can be deployed in one command via `pwsh ./tools/deploy_cloudflare_leaderboard.ps1` (see `backend/cloudflare/README.md`).
+- **Alternative PostgreSQL backend (`backend/supabase/`)**: **Supabase (Postgres + Edge Function)**.
 
 ### Evaluation
 A small **Supabase (Postgres + Edge Function)** backend is well suited for a lightweight arcade game across approved web portals:

@@ -10,3 +10,5 @@ dist/
 BillusBucket.Web/wwwroot/Assets/
 
 node_modules/
+.wrangler/
+.dev.vars*

@@ -15,9 +15,10 @@ window.BILLU_PLATFORM_CONFIG = Object.assign({
     // Poki for Developers -> Settings -> CSP alongside your game's Privacy Policy.
     pokiApprovedExternalLeaderboardEnabled: false,
 
-    // Optional shared weekly Top-10 leaderboard backend (e.g. Supabase Edge Function URL + public anon key).
-    // Never place a private service_role secret key in client-side files.
-    sharedLeaderboardEnabled: false,
-    sharedLeaderboardEndpointUrl: "",
+    // Optional shared weekly Top-10 leaderboard backend:
+    // - Cloudflare Worker + D1 (recommended): set sharedLeaderboardEndpointUrl to your *.workers.dev URL and leave sharedLeaderboardPublicKey as "".
+    // - Supabase Edge Function: set sharedLeaderboardEndpointUrl and public anon key (never service_role).
+    sharedLeaderboardEnabled: true,
+    sharedLeaderboardEndpointUrl: "https://billus-bucket-leaderboard.moooviez.workers.dev",
     sharedLeaderboardPublicKey: ""
 }, window.BILLU_PLATFORM_CONFIG || {});

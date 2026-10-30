@@ -1,0 +1,15 @@
+{
+  "name": "billus-bucket-leaderboard",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "vars": {
+    "ALLOWED_ORIGINS": "https://gr33nops.github.io,http://127.0.0.1:5099,http://localhost:5099"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "billus-bucket-leaderboard",
+      "database_id": "470c8717-f8ff-4290-9ba2-9edd74ffd527"
+    }
+  ]
+}

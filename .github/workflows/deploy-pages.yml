@@ -44,6 +44,9 @@ jobs:
       - name: Check leaderboard SQL in PostgreSQL
         run: node --test GameTests/leaderboard-sql.test.cjs
 
+      - name: Check Cloudflare Worker + D1 SQLite leaderboard
+        run: node --test GameTests/cloudflare-leaderboard.test.mjs
+
       - name: Check browser failure handling
         run: node --test GameTests/platform-bridge.test.cjs
 
