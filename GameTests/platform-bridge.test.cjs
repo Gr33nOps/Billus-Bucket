@@ -27,6 +27,9 @@ function setup(view = null) {
     window: {
       innerWidth: view?.width,
       innerHeight: view?.height,
+      matchMedia() {
+        return { matches: Boolean(view?.mobile) };
+      },
       visualViewport: view
         ? {
           width: view.width,
@@ -48,6 +51,16 @@ function setup(view = null) {
       getElementById(id) {
         if (view && id === "theCanvas") return canvas;
         if (view && id === "canvasHolder") return holder;
+        if (view && id === "viewportProbe") {
+          return {
+            getBoundingClientRect() {
+              return {
+                width: view.width,
+                height: view.smallHeight || view.height,
+              };
+            },
+          };
+        }
         return id === "blazor-error-ui"
           ? error
           : id === "loadingOverlay"
@@ -109,4 +122,18 @@ test("short phone viewport never forces a taller canvas", () => {
   const s = setup({ width: 320, height: 140, visibleHeight: 140 });
   s.api.syncResponsiveCanvasLayout();
   assert.equal(s.canvas.height, 140);
+});
+
+test("mobile uses smaller viewport measurement and reserves a bottom margin", () => {
+  const s = setup({
+    width: 844,
+    height: 390,
+    visibleHeight: 390,
+    smallHeight: 280,
+    mobile: true,
+  });
+  s.api.syncResponsiveCanvasLayout();
+  const bounds = s.api.getGameViewport();
+  assert(bounds.y >= 8);
+  assert(bounds.y + bounds.height <= 268);
 });

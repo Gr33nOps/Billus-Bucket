@@ -295,6 +295,7 @@
     }
 
     let gameViewport = null;
+    let lastViewportCheck = 0;
 
     function syncResponsiveCanvasLayout() {
         const canvas = document.getElementById("theCanvas");
@@ -308,19 +309,23 @@
         const viewW = Math.max(1, Math.floor(window.innerWidth || holder.clientWidth || 1280));
         const viewH = Math.max(1, Math.floor(window.innerHeight || holder.clientHeight || 720));
         const visual = window.visualViewport;
+        const measured = document.getElementById("viewportProbe")?.getBoundingClientRect();
         const left = Math.max(0, Math.floor(visual?.offsetLeft || 0));
         const top = Math.max(0, Math.floor(visual?.offsetTop || 0));
         const width = Math.max(1, Math.floor(Math.min(viewW - left, visual?.width || viewW)));
-        const height = Math.max(1, Math.floor(Math.min(viewH - top, visual?.height || viewH)));
+        const height = Math.max(1, Math.floor(Math.min(viewH - top, visual?.height || viewH,
+            measured?.height > 0 ? measured.height : viewH)));
         const style = getComputedStyle(holder);
         const inset = key => Math.max(0, Math.ceil(parseFloat(style[key]) || 0));
-        const safeLeft = Math.min(width - 1, inset("paddingLeft"));
-        const safeTop = Math.min(height - 1, inset("paddingTop"));
+        const mobile = Boolean(window.matchMedia?.("(pointer: coarse)").matches);
+        const margin = mobile ? 8 : 0;
+        const safeLeft = Math.min(width - 1, inset("paddingLeft") + margin);
+        const safeTop = Math.min(height - 1, inset("paddingTop") + margin);
         gameViewport = {
             x: left + safeLeft,
             y: top + safeTop,
-            width: Math.max(1, width - safeLeft - inset("paddingRight")),
-            height: Math.max(1, height - safeTop - inset("paddingBottom"))
+            width: Math.max(1, width - safeLeft - inset("paddingRight") - margin),
+            height: Math.max(1, height - safeTop - inset("paddingBottom") - (mobile ? 12 : 0))
         };
         holder.style.width = viewW + "px";
         holder.style.height = viewH + "px";
@@ -360,6 +365,11 @@
     function tickAnimationFrame() {
         if (!renderLoopRunning) return;
         try {
+            // Embedded mobile browsers can change their toolbar without a resize event.
+            if (Date.now() - lastViewportCheck > 250) {
+                syncResponsiveCanvasLayout();
+                lastViewportCheck = Date.now();
+            }
             if (dotNetInstance) dotNetInstance.invokeMethod("TickDotNet");
         } catch (error) {
             showFatalError(error);
