@@ -294,6 +294,8 @@
         }
     }
 
+    let gameViewport = null;
+
     function syncResponsiveCanvasLayout() {
         const canvas = document.getElementById("theCanvas");
         const holder = document.getElementById("canvasHolder");
@@ -301,8 +303,32 @@
             return;
         }
 
-        const viewW = Math.max(320, Math.floor(holder.clientWidth || window.innerWidth || 1280));
-        const viewH = Math.max(180, Math.floor(holder.clientHeight || window.innerHeight || 720));
+        // Keep the backing canvas in client coordinates, but fit the game within
+        // the visible rectangle after browser chrome and device cutouts are removed.
+        const viewW = Math.max(1, Math.floor(window.innerWidth || holder.clientWidth || 1280));
+        const viewH = Math.max(1, Math.floor(window.innerHeight || holder.clientHeight || 720));
+        const visual = window.visualViewport;
+        const left = Math.max(0, Math.floor(visual?.offsetLeft || 0));
+        const top = Math.max(0, Math.floor(visual?.offsetTop || 0));
+        const width = Math.max(1, Math.floor(Math.min(viewW - left, visual?.width || viewW)));
+        const height = Math.max(1, Math.floor(Math.min(viewH - top, visual?.height || viewH)));
+        const style = getComputedStyle(holder);
+        const inset = key => Math.max(0, Math.ceil(parseFloat(style[key]) || 0));
+        const safeLeft = Math.min(width - 1, inset("paddingLeft"));
+        const safeTop = Math.min(height - 1, inset("paddingTop"));
+        gameViewport = {
+            x: left + safeLeft,
+            y: top + safeTop,
+            width: Math.max(1, width - safeLeft - inset("paddingRight")),
+            height: Math.max(1, height - safeTop - inset("paddingBottom"))
+        };
+        holder.style.width = viewW + "px";
+        holder.style.height = viewH + "px";
+        const root = document.documentElement.style;
+        root.setProperty("--visible-x", left + "px");
+        root.setProperty("--visible-y", top + "px");
+        root.setProperty("--visible-width", width + "px");
+        root.setProperty("--visible-height", height + "px");
 
         // Keep #theCanvas aligned with the full client viewport at (0, 0) so KNI's clientX/clientY
         // mouse & touch events match GraphicsDevice.Viewport 1:1 while C# letterboxes 320x180 to 16:9.
@@ -370,6 +396,8 @@
 
     window.addEventListener("resize", syncResponsiveCanvasLayout);
     window.addEventListener("orientationchange", syncResponsiveCanvasLayout);
+    window.visualViewport?.addEventListener("resize", syncResponsiveCanvasLayout);
+    window.visualViewport?.addEventListener("scroll", syncResponsiveCanvasLayout);
 
     document.addEventListener("visibilitychange", function () {
         externalAudioMuted = document.hidden === true;
@@ -399,6 +427,7 @@
         showFatalError: showFatalError,
         isExternalAudioMuted: isExternalAudioMuted,
         getAssetVersion: getAssetVersion,
+        getGameViewport: () => gameViewport,
         syncResponsiveCanvasLayout: syncResponsiveCanvasLayout
     };
 })();

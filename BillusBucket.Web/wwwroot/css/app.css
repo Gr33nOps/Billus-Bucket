@@ -12,8 +12,8 @@ html, body {
 }
 
 #app {
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
 }
 
@@ -41,8 +41,11 @@ html, body {
 #canvasHolder {
     position: fixed;
     inset: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+             env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
     background-color: #161524;
     overflow: hidden;
 }
@@ -73,7 +76,7 @@ html, body {
     flex-direction: column;
     align-items: center;
     gap: 24px;
-    width: min(92vw, 560px);
+    width: min(100%, 560px);
     text-align: center;
 }
 
@@ -92,8 +95,24 @@ html, body {
 }
 
 .loading-subtitle { font-size: 11px; letter-spacing: .1em; text-shadow: 1px 1px #232438; }
-@media (max-width: 480px) { .loading-scene { gap: 18px; } .loading-logo { width: 384px; max-width: none; } }
+@media (max-width: 480px) { .loading-scene { gap: 18px; } .loading-logo { width: 384px; } }
 @media (max-width: 383px) { .loading-logo { width: 256px; } }
+
+#loadingOverlay, #rotatePrompt {
+    inset: auto;
+    left: var(--visible-x, 0px);
+    top: var(--visible-y, 0px);
+    width: var(--visible-width, 100%);
+    height: var(--visible-height, 100%);
+    box-sizing: border-box;
+    padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+             max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+}
+@media (max-height: 380px) {
+    .loading-scene { gap: 12px; }
+    .loading-logo { width: 384px; }
+    .loading-bucket { width: 84px; height: 48px; margin: 4px 0; }
+}
 
 #blazor-error-ui {
     background: #514352;

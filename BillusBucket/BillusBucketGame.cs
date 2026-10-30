@@ -1663,6 +1663,16 @@ namespace BillusBucket
                 return new Rectangle(0, 0, PixelArt.WindowWidth, PixelArt.WindowHeight);
             }
 
+            int safeX = 0, safeY = 0;
+            GameViewportBounds visible = platformBridge.ViewportBounds;
+            if (visible != null && visible.Width > 0 && visible.Height > 0)
+            {
+                safeX = Math.Clamp(visible.X, 0, viewportWidth - 1);
+                safeY = Math.Clamp(visible.Y, 0, viewportHeight - 1);
+                viewportWidth = Math.Clamp(visible.Width, 1, viewportWidth - safeX);
+                viewportHeight = Math.Clamp(visible.Height, 1, viewportHeight - safeY);
+            }
+
             int destWidth;
             int destHeight;
             if ((long)viewportWidth * PixelArt.Height <= (long)viewportHeight * PixelArt.FieldWidth)
@@ -1678,7 +1688,7 @@ namespace BillusBucket
 
             int offsetX = (viewportWidth - destWidth) / 2;
             int offsetY = (viewportHeight - destHeight) / 2;
-            return new Rectangle(offsetX, offsetY, destWidth, destHeight);
+            return new Rectangle(safeX + offsetX, safeY + offsetY, destWidth, destHeight);
         }
 
         private static bool IsInsideCanvas(float screenX, float screenY, Rectangle canvasDestination)

@@ -2,15 +2,40 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
 const fs = require("node:fs");
-function setup() {
+function setup(view = null) {
   let queued;
   const error = { style: { display: "none" } };
   const overlay = { style: { display: "block" } };
+  const canvas = { width: 0, height: 0, style: {}, addEventListener() {} };
+  const holder = {
+    style: {},
+    clientWidth: view?.width,
+    clientHeight: view?.height,
+  };
   const context = {
     console: { error() {} },
     Map,
     URLSearchParams,
+    getComputedStyle() {
+      return {
+        paddingLeft: String(view?.left || 0),
+        paddingRight: String(view?.right || 0),
+        paddingTop: "0",
+        paddingBottom: String(view?.bottom || 0),
+      };
+    },
     window: {
+      innerWidth: view?.width,
+      innerHeight: view?.height,
+      visualViewport: view
+        ? {
+          width: view.width,
+          height: view.visibleHeight,
+          offsetLeft: 0,
+          offsetTop: 0,
+          addEventListener() {},
+        }
+        : undefined,
       addEventListener() {},
       requestAnimationFrame(f) {
         queued = f;
@@ -18,8 +43,11 @@ function setup() {
       location: { hostname: "localhost" },
     },
     document: {
+      documentElement: { style: { setProperty() {} } },
       addEventListener() {},
       getElementById(id) {
+        if (view && id === "theCanvas") return canvas;
+        if (view && id === "canvasHolder") return holder;
         return id === "blazor-error-ui"
           ? error
           : id === "loadingOverlay"
@@ -37,6 +65,7 @@ function setup() {
     api: context.window.billuPlatform,
     error,
     overlay,
+    canvas,
     tick() {
       const f = queued;
       queued = null;
@@ -55,4 +84,29 @@ test("fatal game exception stops rendering and displays reload UI", () => {
   assert.equal(s.tick(), null);
   assert.equal(s.error.style.display, "block");
   assert.equal(s.overlay.style.display, "none");
+});
+
+test("mobile viewport excludes browser bars and notch insets", () => {
+  const s = setup({
+    width: 844,
+    height: 390,
+    visibleHeight: 300,
+    left: 44,
+    right: 44,
+    bottom: 21,
+  });
+  s.api.syncResponsiveCanvasLayout();
+  const bounds = s.api.getGameViewport();
+  assert.deepEqual(JSON.parse(JSON.stringify(bounds)), {
+    x: 44,
+    y: 0,
+    width: 756,
+    height: 279,
+  });
+});
+
+test("short phone viewport never forces a taller canvas", () => {
+  const s = setup({ width: 320, height: 140, visibleHeight: 140 });
+  s.api.syncResponsiveCanvasLayout();
+  assert.equal(s.canvas.height, 140);
 });

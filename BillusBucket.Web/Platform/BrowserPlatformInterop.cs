@@ -46,6 +46,14 @@ namespace BillusBucket.Web
         public BrowserBootstrapState State { get; private set; } = new BrowserBootstrapState();
 
         public string PlatformId => State.ActivePlatform;
+        public GameViewportBounds ViewportBounds
+        {
+            get
+            {
+                try { return jsInProcess?.Invoke<GameViewportBounds>("billuPlatform.getGameViewport"); }
+                catch { return null; }
+            }
+        }
 
         public bool IsExternalAudioMuted
         {

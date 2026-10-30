@@ -3,6 +3,13 @@ using System.Threading.Tasks;
 
 namespace BillusBucket
 {
+    public sealed class GameViewportBounds
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+    }
     /// <summary>
     /// Configuration selecting the active publishing platform and leaderboard integration.
     /// Safe defaults ensure zero unauthorized external requests on strict CSP portals like Poki.
@@ -31,6 +38,7 @@ namespace BillusBucket
     {
         string PlatformId { get; }
         bool IsExternalAudioMuted { get; }
+        GameViewportBounds ViewportBounds => null;
 
         Task InitializeAsync();
         void NotifyLoadingStarted();
@@ -73,6 +81,7 @@ namespace BillusBucket
         private bool gameplayActive;
 
         public string PlatformId => inner.PlatformId;
+        public GameViewportBounds ViewportBounds => inner.ViewportBounds;
         public bool IsExternalAudioMuted => inner.IsExternalAudioMuted;
         public bool IsGameplayActive => gameplayActive;
         public bool IsLoadingFinished => loadingFinished;
