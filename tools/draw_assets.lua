@@ -391,6 +391,12 @@ for i=1,#cableAnchors-1 do
 end
 local roof=img(320,180)
 rect(roof,0,157,320,9,0x886879);rect(roof,0,157,320,1,0xb58a82);rect(roof,0,165,320,15,0x51465e);rect(roof,0,165,320,2,0xaa807b)
+-- Restrained plaster wear matches the rooftop room: broad shade, small chipped patches.
+rect(roof,0,162,320,2,0x795c6e)
+for _,q in ipairs({{57,160,4},{91,158,3},{126,161,5},{177,159,3},{217,161,4},{249,158,3}}) do
+ rect(roof,q[1],q[2],q[3],1,0x795c6e)
+ px(roof,q[1]+1,q[2]-1,0x9a7885)
+end
 for x=0,319,29 do rect(roof,x,168,1,12,0x3e3852);rect(roof,x+1,169,1,8,0x715a70);line(roof,x+2,178,x+27,178,0x3e3852);px(roof,x+5,167,0x886879) end
 for _,q in ipairs({{14,171},{42,174},{80,169},{119,174},{157,171},{201,175},{252,170},{287,173}}) do rect(roof,q[1],q[2],3,1,0x665269) end
 local props=img(320,180)
@@ -413,6 +419,10 @@ local function plant(x,y)
   line(leaves,10,13,q[1],q[2],0x748969)
  end
  rect(leaves,9,11,3,3,0x748969)
+ -- A few connected highlights and shaded stems, using the existing muted greens.
+ line(leaves,10,12,7,3,0x607554);line(leaves,10,12,12,3,0x607554)
+ line(leaves,5,6,7,8,0x96a477);line(leaves,14,7,16,5,0x96a477)
+ px(leaves,7,1,0x96a477);px(leaves,12,1,0x96a477)
  for yy=0,14 do for xx=0,20 do
   if app.pixelColor.rgbaA(leaves:getPixel(xx,yy))>0 then
    for _,d in ipairs({{-1,0},{1,0},{0,-1},{0,1}}) do px(edged,xx+d[1],yy+d[2],'ink') end
@@ -422,11 +432,16 @@ local function plant(x,y)
  -- Explicit pixel rows keep the rim level and the tapered sides symmetric.
  rect(props,x-5,y,12,3,'ink')
  rect(props,x-4,y+1,10,1,0xb77c59)
+ line(props,x-3,y+1,x,y+1,0xc49365)
  rect(props,x-4,y+3,10,1,'ink');rect(props,x-3,y+3,8,1,0x743e43)
  rect(props,x-3,y+4,8,1,'ink');rect(props,x-2,y+4,6,1,0x743e43)
  rect(props,x-3,y+5,8,1,'ink')
+ px(props,x-2,y+3,0x95584b);px(props,x-1,y+3,0x95584b)
+ px(props,x+3,y+3,0x603941);px(props,x+2,y+4,0x603941)
 end
 plant(45,159);rect(props,290,153,30,12,0x7f5260);rect(props,287,152,33,3,0xb58a82);plant(307,146)
+rect(props,291,154,29,1,0x694653);rect(props,291,155,2,8,0x956575)
+rect(props,298,158,3,1,0x956575);rect(props,313,161,4,1,0x694653)
 rect(props,268,120,2,45,0x232438);rect(props,269,121,1,43,0x6d4b5c);rect(props,316,121,2,31,0x232438)
 line(props,267,123,290,127,'ink');line(props,290,127,319,124,'ink')
 poly(props,{{274,125},{284,127},{284,141},{277,142},{275,139}},0x853f58);line(props,277,128,278,139,0xb75a68);line(props,282,128,282,140,0x6d3854)

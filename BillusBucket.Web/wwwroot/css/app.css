@@ -41,7 +41,7 @@ html, body {
     z-index: 20;
     display: grid;
     place-items: center;
-    background: linear-gradient(#232438b8, #232438b8), url('../Assets/rooftop.png') center / cover;
+    background: #232438;
     image-rendering: pixelated;
     color: #c0b4c7;
     font-family: monospace;
@@ -68,28 +68,11 @@ html, body {
     height: 64px;
     margin: 8px 0;
     image-rendering: pixelated;
-    animation: bucket-bob 1s steps(4, end) infinite;
 }
 
-.loading-steps { display: flex; gap: 8px; height: 8px; }
-.loading-steps i {
-    display: block;
-    width: 8px;
-    height: 8px;
-    background: #3d9993;
-    box-shadow: 2px 2px #232438;
-    animation: loading-step 1.2s steps(1, end) infinite;
-}
-.loading-steps i:nth-child(2) { animation-delay: .15s; }
-.loading-steps i:nth-child(3) { animation-delay: .3s; }
-.loading-steps i:nth-child(4) { animation-delay: .45s; }
-.loading-steps i:nth-child(5) { animation-delay: .6s; }
 .loading-subtitle { font-size: 11px; letter-spacing: .1em; text-shadow: 1px 1px #232438; }
-@keyframes bucket-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-@keyframes loading-step { 0%, 60% { background: #3d9993; } 30% { background: #f0d398; } }
 @media (max-width: 480px) { .loading-scene { gap: 18px; } .loading-logo { width: 384px; max-width: none; } }
 @media (max-width: 383px) { .loading-logo { width: 256px; } }
-@media (prefers-reduced-motion: reduce) { .loading-bucket, .loading-steps i { animation: none; } }
 
 #blazor-error-ui {
     background: #514352;

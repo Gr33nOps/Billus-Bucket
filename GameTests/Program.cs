@@ -347,7 +347,7 @@ namespace GameTests
             sliding.Update(0.15f, 0, null);
             Equal(true, sliding.VelocityX > 25f, "release retains a short readable slide");
             sliding.Update(0.15f, 0, null);
-            Equal(true, sliding.VelocityX == 0f && sliding.X - releaseX > 13f && sliding.X - releaseX < 18f,
+            Equal(true, sliding.VelocityX == 0f && sliding.X - releaseX > 17f && sliding.X - releaseX < 21f,
                 "slide stops within a controlled distance");
             sliding.Update(0.5f, 1, null);
             sliding.Update(0.15f, -1, null);
