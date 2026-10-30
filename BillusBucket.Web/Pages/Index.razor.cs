@@ -79,10 +79,12 @@ namespace BillusBucket.Web.Pages
             InMemoryAssetStreamProvider provider = new InMemoryAssetStreamProvider();
             string[] assetPaths = InMemoryAssetStreamProvider.RequiredAssets;
             Task<byte[]>[] downloads = new Task<byte[]>[assetPaths.Length];
+            string assetVersion = await JsRuntime.InvokeAsync<string>("billuPlatform.getAssetVersion");
 
             for (int i = 0; i < assetPaths.Length; i++)
             {
-                downloads[i] = Http.GetByteArrayAsync("Assets/" + assetPaths[i]);
+                downloads[i] = Http.GetByteArrayAsync(
+                    "Assets/" + assetPaths[i] + "?v=" + Uri.EscapeDataString(assetVersion));
             }
 
             await Task.WhenAll(downloads);

@@ -62,6 +62,11 @@ Get-ChildItem -Path $OutputDir -Recurse -Include *.br, *.gz | Remove-Item -Force
 # Inject ONLY the target portal's official SDK script into index.html (strict CSP compliance).
 $indexHtmlPath = Join-Path $OutputDir "index.html"
 $indexHtml = Get-Content -Path $indexHtmlPath -Raw
+$safeRepoRoot = $repoRoot.Replace('\', '/')
+$buildRevision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (git -c "safe.directory=$safeRepoRoot" -C $repoRoot rev-parse --short HEAD).Trim() }
+if ($buildRevision -notmatch '^[0-9a-f]{7,40}$') {
+    throw "Could not determine a safe asset revision for this build."
+}
 
 $sdkTag = switch ($Platform) {
     "crazygames" { '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>' }
@@ -70,6 +75,7 @@ $sdkTag = switch ($Platform) {
 }
 
 $indexHtml = $indexHtml.Replace("<!-- PORTAL_SDK_SCRIPT_SLOT -->", $sdkTag)
+$indexHtml = $indexHtml.Replace("__BILLU_ASSET_VERSION__", $buildRevision)
 Set-Content -Path $indexHtmlPath -Value $indexHtml -NoNewline -Encoding UTF8
 
 # Set activePlatform in platform-config.js

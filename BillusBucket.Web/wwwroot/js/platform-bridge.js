@@ -363,6 +363,10 @@
         return externalAudioMuted || document.hidden === true;
     }
 
+    function getAssetVersion() {
+        return document.querySelector('meta[name="billu-build"]')?.content || "dev";
+    }
+
     window.addEventListener("resize", syncResponsiveCanvasLayout);
     window.addEventListener("orientationchange", syncResponsiveCanvasLayout);
 
@@ -393,6 +397,7 @@
         startRenderLoop: startRenderLoop,
         showFatalError: showFatalError,
         isExternalAudioMuted: isExternalAudioMuted,
+        getAssetVersion: getAssetVersion,
         syncResponsiveCanvasLayout: syncResponsiveCanvasLayout
     };
 })();
