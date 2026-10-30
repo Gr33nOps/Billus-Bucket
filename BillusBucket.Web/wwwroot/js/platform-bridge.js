@@ -127,6 +127,49 @@
         return copied;
     }
 
+    let pendingPastedText = null;
+
+    function recordPastedText(text) {
+        if (!text) {
+            return;
+        }
+        const cleaned = String(text).trim();
+        if (cleaned) {
+            pendingPastedText = cleaned;
+        }
+    }
+
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+        window.addEventListener("paste", function (e) {
+            try {
+                const text = e.clipboardData?.getData("text/plain");
+                if (text) {
+                    recordPastedText(text);
+                }
+            } catch (_err) {
+            }
+        });
+    }
+
+    function consumePastedText() {
+        const text = pendingPastedText;
+        pendingPastedText = null;
+        return text || "";
+    }
+
+    function requestClipboardPaste() {
+        try {
+            if (typeof window !== "undefined" && window.navigator?.clipboard?.readText) {
+                window.navigator.clipboard.readText().then(function (text) {
+                    recordPastedText(text);
+                }).catch(function () {});
+                return true;
+            }
+        } catch (_err) {
+        }
+        return false;
+    }
+
     function getEffectiveConfig() {
         const raw = window.BILLU_PLATFORM_CONFIG || {};
         let platform = String(raw.activePlatform || "local").trim().toLowerCase();
@@ -470,6 +513,9 @@
         storageGet: storageGet,
         storageSet: storageSet,
         copyTextToClipboard: copyTextToClipboard,
+        requestClipboardPaste: requestClipboardPaste,
+        consumePastedText: consumePastedText,
+        recordPastedText: recordPastedText,
         startRenderLoop: startRenderLoop,
         showFatalError: showFatalError,
         isExternalAudioMuted: isExternalAudioMuted,

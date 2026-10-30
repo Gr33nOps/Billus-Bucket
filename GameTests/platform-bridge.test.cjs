@@ -154,3 +154,11 @@ test("copyTextToClipboard copies Save Code cleanly and rejects empty input", () 
   assert.equal(s.api.copyTextToClipboard("  K7P4-M9X2-W3R8  "), true);
   assert.equal(s.getCopiedText(), "K7P4-M9X2-W3R8");
 });
+
+test("consumePastedText returns single-use pasted text for Ctrl+V or paste button", () => {
+  const s = setup();
+  assert.equal(s.api.consumePastedText(), "");
+  s.api.recordPastedText("  K7P4-M9X2-W3R8  ");
+  assert.equal(s.api.consumePastedText(), "K7P4-M9X2-W3R8");
+  assert.equal(s.api.consumePastedText(), "");
+});

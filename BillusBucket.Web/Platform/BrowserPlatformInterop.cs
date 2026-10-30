@@ -141,6 +141,49 @@ namespace BillusBucket.Web
             }
         }
 
+        public bool RequestClipboardPaste()
+        {
+            try
+            {
+                if (jsInProcess != null)
+                {
+                    return jsInProcess.Invoke<bool>("billuPlatform.requestClipboardPaste");
+                }
+
+                _ = jsRuntime.InvokeVoidAsync("billuPlatform.requestClipboardPaste");
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool TryConsumePastedText(out string text)
+        {
+            text = null;
+            try
+            {
+                if (jsInProcess == null)
+                {
+                    return false;
+                }
+
+                string candidate = jsInProcess.Invoke<string>("billuPlatform.consumePastedText");
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    return false;
+                }
+
+                text = candidate;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private void InvokeFireAndForget(string identifier)
         {
             try

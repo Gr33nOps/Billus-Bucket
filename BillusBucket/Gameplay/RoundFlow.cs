@@ -46,7 +46,7 @@ namespace BillusBucket
         public static readonly ButtonBounds TopRightLeaderboardButton = new ButtonBounds(292, 71, 20, 16);
 
         private static readonly ButtonBounds CenterMenuButton = new ButtonBounds(126, 85, 68, 18);
-        private static readonly ButtonBounds LeaderboardBackButton = new ButtonBounds(126, 148, 68, 18);
+        private static readonly ButtonBounds LeaderboardBackButton = new ButtonBounds(130, 147, 60, 18);
 
         public RoundPhase Phase { get; private set; } = RoundPhase.Ready;
         public bool IsLeaderboardOpen { get; private set; }

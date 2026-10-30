@@ -46,6 +46,12 @@ namespace BillusBucket
         void NotifyGameplayStart();
         void NotifyGameplayStop();
         bool TryCopyTextToClipboard(string text) => false;
+        bool RequestClipboardPaste() => false;
+        bool TryConsumePastedText(out string text)
+        {
+            text = null;
+            return false;
+        }
     }
 
     /// <summary>
@@ -155,6 +161,16 @@ namespace BillusBucket
         public bool TryCopyTextToClipboard(string text)
         {
             return inner.TryCopyTextToClipboard(text);
+        }
+
+        public bool RequestClipboardPaste()
+        {
+            return inner.RequestClipboardPaste();
+        }
+
+        public bool TryConsumePastedText(out string text)
+        {
+            return inner.TryConsumePastedText(out text);
         }
     }
 }

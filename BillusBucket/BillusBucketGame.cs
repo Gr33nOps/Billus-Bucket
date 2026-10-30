@@ -77,13 +77,19 @@ namespace BillusBucket
         private static readonly ButtonBounds SfxButton = new ButtonBounds(292, 50, 20, 16);
         private static readonly ButtonBounds LeaderboardIconButton = RoundFlow.TopRightLeaderboardButton;
 
-        // Leaderboard, Custom Name, and Cloud Sync button hitboxes (inside x = 50..270 playfield column)
-        private static readonly ButtonBounds LeaderboardNameButton = new ButtonBounds(52, 148, 68, 18);
-        private static readonly ButtonBounds LeaderboardSyncButton = new ButtonBounds(200, 148, 68, 18);
-        private static readonly ButtonBounds ModalCancelButton = new ButtonBounds(86, 148, 68, 18);
-        private static readonly ButtonBounds ModalConfirmButton = new ButtonBounds(166, 148, 68, 18);
-        private static readonly ButtonBounds SyncCopyButton = new ButtonBounds(58, 104, 96, 18);
-        private static readonly ButtonBounds SyncEnterCodeButton = new ButtonBounds(166, 104, 96, 18);
+        // Leaderboard timber panel: face spans y = 12..169, so every button below sits fully inside it.
+        private static readonly Rectangle LeaderboardPanel = new Rectangle(50, 5, 220, 171);
+
+        // Leaderboard, Custom Name, and Cloud Sync button hitboxes (all inside the panel face x = 55..265)
+        private static readonly ButtonBounds LeaderboardNameButton = new ButtonBounds(63, 147, 60, 18);
+        private static readonly ButtonBounds LeaderboardSyncButton = new ButtonBounds(197, 147, 60, 18);
+        private static readonly ButtonBounds NameCancelButton = new ButtonBounds(86, 147, 68, 18);
+        private static readonly ButtonBounds NameSaveButton = new ButtonBounds(166, 147, 68, 18);
+        private static readonly ButtonBounds CodeCancelButton = new ButtonBounds(63, 147, 60, 18);
+        private static readonly ButtonBounds CodePasteButton = new ButtonBounds(130, 147, 60, 18);
+        private static readonly ButtonBounds CodeConnectButton = new ButtonBounds(197, 147, 60, 18);
+        private static readonly ButtonBounds SyncCopyButton = new ButtonBounds(58, 108, 96, 18);
+        private static readonly ButtonBounds SyncEnterCodeButton = new ButtonBounds(166, 108, 96, 18);
         private static readonly KeypadKey[] OnScreenKeypad = BuildOnScreenKeypad();
 
         private static readonly Keys[] LetterKeys =
@@ -180,6 +186,7 @@ namespace BillusBucket
         private bool isLeaderboardSyncHovered;
         private bool isModalCancelHovered;
         private bool isModalConfirmHovered;
+        private bool isModalPasteHovered;
         private bool isSyncCopyHovered;
         private bool isSyncEnterCodeHovered;
         private int hoveredKeypadIndex = -1;
@@ -600,6 +607,7 @@ namespace BillusBucket
             isLeaderboardSyncHovered = false;
             isModalCancelHovered = false;
             isModalConfirmHovered = false;
+            isModalPasteHovered = false;
             isSyncCopyHovered = false;
             isSyncEnterCodeHovered = false;
             hoveredKeypadIndex = -1;
@@ -643,8 +651,11 @@ namespace BillusBucket
             else if (leaderboardSubView == LeaderboardSubView.EditName ||
                      leaderboardSubView == LeaderboardSubView.SyncEnterCode)
             {
-                isModalCancelHovered = !isProfileBusy && ModalCancelButton.Contains(mouseCanvas.X, mouseCanvas.Y);
-                isModalConfirmHovered = !isProfileBusy && ModalConfirmButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+                isModalCancelHovered = !isProfileBusy && GetModalCancelButton().Contains(mouseCanvas.X, mouseCanvas.Y);
+                isModalConfirmHovered = !isProfileBusy && GetModalConfirmButton().Contains(mouseCanvas.X, mouseCanvas.Y);
+                isModalPasteHovered = !isProfileBusy &&
+                                      leaderboardSubView == LeaderboardSubView.SyncEnterCode &&
+                                      CodePasteButton.Contains(mouseCanvas.X, mouseCanvas.Y);
 
                 if (!isProfileBusy)
                 {
@@ -803,6 +814,7 @@ namespace BillusBucket
             isProfileBusy = false;
             editorStatusMessage = string.Empty;
             editorStatusIsError = false;
+            DiscardStalePastedText();
 
             if (leaderboardService != null && leaderboardService.HasCustomPlayerName)
             {
@@ -836,6 +848,7 @@ namespace BillusBucket
             editorBuffer = string.Empty;
             editorStatusMessage = string.Empty;
             editorStatusIsError = false;
+            DiscardStalePastedText();
         }
 
         private void UpdateLeaderboardScreenInput(
@@ -984,6 +997,7 @@ namespace BillusBucket
             }
 
             HandlePhysicalKeyboardTextEntry(keys, isNameMode, maxLength);
+            HandleClipboardPaste(keys);
 
             if (!pointerPoint.HasValue)
             {
@@ -991,17 +1005,24 @@ namespace BillusBucket
             }
 
             Point pt = pointerPoint.Value;
-            if (ModalCancelButton.Contains(pt.X, pt.Y))
+            if (GetModalCancelButton().Contains(pt.X, pt.Y))
             {
                 ignorePointerUntilRelease = true;
                 CancelKeypadModal();
                 return;
             }
 
-            if (ModalConfirmButton.Contains(pt.X, pt.Y))
+            if (GetModalConfirmButton().Contains(pt.X, pt.Y))
             {
                 ignorePointerUntilRelease = true;
                 ConfirmKeypadModal();
+                return;
+            }
+
+            if (!isNameMode && CodePasteButton.Contains(pt.X, pt.Y))
+            {
+                ignorePointerUntilRelease = true;
+                RequestPasteFromClipboard();
                 return;
             }
 
@@ -1030,6 +1051,12 @@ namespace BillusBucket
         private void HandlePhysicalKeyboardTextEntry(KeyboardState keys, bool allowPunctuation, int maxLength)
         {
             bool shiftHeld = keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift);
+
+            // Ctrl+V / Cmd+V is a paste shortcut, so never type the letter itself.
+            if (IsShortcutModifierHeld(keys))
+            {
+                return;
+            }
 
             for (int i = 0; i < LetterKeys.Length; i++)
             {
@@ -1077,6 +1104,119 @@ namespace BillusBucket
             {
                 AppendEditorCharacter('_', maxLength);
             }
+        }
+
+        private static bool IsShortcutModifierHeld(KeyboardState keys)
+        {
+            return keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl) ||
+                   keys.IsKeyDown(Keys.LeftWindows) || keys.IsKeyDown(Keys.RightWindows);
+        }
+
+        private ButtonBounds GetModalCancelButton()
+        {
+            return leaderboardSubView == LeaderboardSubView.SyncEnterCode ? CodeCancelButton : NameCancelButton;
+        }
+
+        private ButtonBounds GetModalConfirmButton()
+        {
+            return leaderboardSubView == LeaderboardSubView.SyncEnterCode ? CodeConnectButton : NameSaveButton;
+        }
+
+        /// <summary>
+        /// Reads text pasted with Ctrl+V (browser paste event, or SDL clipboard on desktop)
+        /// and puts it into the name or Save Code box.
+        /// </summary>
+        private void HandleClipboardPaste(KeyboardState keys)
+        {
+            if (IsShortcutModifierHeld(keys) && WasKeyJustPressed(keys, Keys.V))
+            {
+#if !BLAZORGL
+                if (DesktopClipboard.TryGetText(out string desktopText))
+                {
+                    ApplyPastedText(desktopText);
+                    return;
+                }
+#else
+                platformBridge.RequestClipboardPaste();
+#endif
+            }
+
+            if (platformBridge.TryConsumePastedText(out string pastedText))
+            {
+                ApplyPastedText(pastedText);
+            }
+        }
+
+        private void RequestPasteFromClipboard()
+        {
+            audio?.Play(GameAudio.SoundToggle);
+#if !BLAZORGL
+            if (DesktopClipboard.TryGetText(out string desktopText))
+            {
+                ApplyPastedText(desktopText);
+                return;
+            }
+#endif
+            // The browser answers asynchronously; HandleClipboardPaste picks the text up on a later frame.
+            if (!platformBridge.RequestClipboardPaste())
+            {
+                editorStatusMessage = "PRESS CTRL+V TO PASTE";
+                editorStatusIsError = true;
+            }
+        }
+
+        private void DiscardStalePastedText()
+        {
+            platformBridge.TryConsumePastedText(out _);
+        }
+
+        private void ApplyPastedText(string rawText)
+        {
+            if (isProfileBusy || string.IsNullOrWhiteSpace(rawText))
+            {
+                return;
+            }
+
+            string cleaned = leaderboardSubView == LeaderboardSubView.SyncEnterCode
+                ? PlayerIdentityValidator.StripConnectCodeCharacters(rawText)
+                : CleanPastedName(rawText);
+
+            if (cleaned.Length == 0)
+            {
+                editorStatusMessage = "NOTHING USEFUL TO PASTE";
+                editorStatusIsError = true;
+                return;
+            }
+
+            editorBuffer = cleaned;
+            editorStatusMessage = "PASTED!";
+            editorStatusIsError = false;
+            audio?.Play(GameAudio.SoundToggle);
+        }
+
+        private static string CleanPastedName(string rawText)
+        {
+            System.Text.StringBuilder name = new System.Text.StringBuilder(PlayerIdentityValidator.MaxNameLength);
+            foreach (char rawChar in rawText.Trim())
+            {
+                if (name.Length >= PlayerIdentityValidator.MaxNameLength)
+                {
+                    break;
+                }
+
+                char c = char.ToUpperInvariant(rawChar);
+                bool isAllowed = (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-';
+                if (isAllowed)
+                {
+                    name.Append(c);
+                }
+                else if (char.IsWhiteSpace(c) && name.Length > 0 && name[name.Length - 1] != '_')
+                {
+                    name.Append('_');
+                }
+            }
+
+            return name.ToString();
         }
 
         private void AppendEditorCharacter(char c, int maxLength)
@@ -1904,8 +2044,7 @@ namespace BillusBucket
 
         private void DrawLeaderboardScreen()
         {
-            Rectangle panel = new Rectangle(50, 8, 220, 146);
-            DrawTimberPanel(panel);
+            DrawTimberPanel(LeaderboardPanel);
 
             if (leaderboardSubView == LeaderboardSubView.EditName)
             {
@@ -1925,7 +2064,7 @@ namespace BillusBucket
                 return;
             }
 
-            DrawLeaderboardRankingsView(panel);
+            DrawLeaderboardRankingsView(LeaderboardPanel);
         }
 
         private void DrawLeaderboardRankingsView(Rectangle panel)
@@ -1937,15 +2076,15 @@ namespace BillusBucket
             BigInteger bestScore = BigInteger.Max(GetCurrentBestScore(), snapshot.PersonalBest);
             string playerName = leaderboardService?.PlayerDisplayName ?? "PLAYER";
 
-            DrawCenteredText("WEEKLY TOP 10", y: 15f, WarmTitleColor, scale: 1);
+            DrawCenteredText("WEEKLY TOP 10", y: 17f, WarmTitleColor, scale: 1);
 
-            DrawText("YOU: " + playerName, new Vector2(60f, 24f), BestValueColor, scale: 1);
+            DrawText("YOU: " + playerName, new Vector2(62f, 28f), BestValueColor, scale: 1);
             if (snapshot.CurrentPlayerWeeklyRank.HasValue)
             {
                 DrawRightAlignedText(
                     "RANK #" + snapshot.CurrentPlayerWeeklyRank.Value,
-                    rightX: 260,
-                    y: 24,
+                    rightX: 258,
+                    y: 28,
                     ScoreValueColor,
                     scale: 1);
             }
@@ -1953,17 +2092,17 @@ namespace BillusBucket
             {
                 DrawRightAlignedText(
                     "BEST " + FitCompactRupeeAmount(bestScore, 64),
-                    rightX: 260,
-                    y: 24,
+                    rightX: 258,
+                    y: 28,
                     BestValueColor,
                     scale: 1);
             }
 
-            DrawRect(panel.X + 10, 33, panel.Width - 20, 1, PanelTimberColor);
+            DrawRect(panel.X + 10, 38, panel.Width - 20, 1, PanelTimberColor);
 
             if (snapshot.IsLoading && snapshot.WeeklyTop10.Count == 0)
             {
-                DrawCenteredText("LOADING WEEKLY SCORES...", y: 78f, HudLabelColor, scale: 1);
+                DrawCenteredText("LOADING WEEKLY SCORES...", y: 84f, HudLabelColor, scale: 1);
             }
             else if (snapshot.WeeklyTop10.Count > 0)
             {
@@ -1971,7 +2110,7 @@ namespace BillusBucket
                 for (int i = 0; i < rowCount; i++)
                 {
                     LeaderboardRankEntry entry = snapshot.WeeklyTop10[i];
-                    int rowY = rowCount > 9 ? (37 + i * 9) : (37 + i * 10);
+                    int rowY = 43 + i * 10;
 
                     Color rowColor = entry.IsCurrentPlayer
                         ? BestValueColor
@@ -1981,11 +2120,11 @@ namespace BillusBucket
                                 ? ScoreValueColor
                                 : ButtonTextColor;
 
-                    DrawText(entry.Rank + ".", new Vector2(60f, rowY), rowColor, scale: 1);
-                    DrawText(entry.DisplayName, new Vector2(82f, rowY), rowColor, scale: 1);
+                    DrawText(entry.Rank + ".", new Vector2(62f, rowY), rowColor, scale: 1);
+                    DrawText(entry.DisplayName, new Vector2(84f, rowY), rowColor, scale: 1);
 
                     string scoreText = FitCompactRupeeAmount(entry.Score, 84);
-                    DrawRightAlignedText(scoreText, rightX: 260, y: rowY, rowColor, scale: 1);
+                    DrawRightAlignedText(scoreText, rightX: 258, y: rowY, rowColor, scale: 1);
                 }
             }
             else
@@ -2010,13 +2149,13 @@ namespace BillusBucket
                     secondaryStatus = "ONLINE WEEKLY BOARD INACTIVE";
                 }
 
-                DrawCenteredText(primaryStatus, y: 70f, ButtonTextColor, scale: 1);
-                DrawCenteredText(secondaryStatus, y: 86f, HudLabelColor, scale: 1);
+                DrawCenteredText(primaryStatus, y: 78f, ButtonTextColor, scale: 1);
+                DrawCenteredText(secondaryStatus, y: 94f, HudLabelColor, scale: 1);
             }
 
             if (rankingsToastTimer > 0f && !string.IsNullOrWhiteSpace(rankingsToastMessage))
             {
-                DrawCenteredText(rankingsToastMessage, y: 136f, ScoreValueColor, scale: 1);
+                DrawCenteredText(rankingsToastMessage, y: 139f, ScoreValueColor, scale: 1);
             }
 
             DrawButton("NAME", LeaderboardNameButton, isLeaderboardNameHovered);
@@ -2028,27 +2167,21 @@ namespace BillusBucket
         {
             bool hasCustom = leaderboardService != null && leaderboardService.HasCustomPlayerName;
             string heading = hasCustom ? "CHANGE YOUR NAME" : "CHOOSE YOUR NAME";
-            DrawCenteredText(heading, y: 15f, WarmTitleColor, scale: 1);
+            DrawCenteredText(heading, y: 17f, WarmTitleColor, scale: 1);
 
             DrawInputBox(
-                new Rectangle(76, 25, 168, 16),
+                new Rectangle(76, 27, 168, 16),
                 editorBuffer,
                 showCursor: !isProfileBusy && editorBuffer.Length < PlayerIdentityValidator.MaxNameLength);
 
-            string statusLine = string.IsNullOrWhiteSpace(editorStatusMessage)
-                ? "2-12 LETTERS OR NUMBERS"
-                : editorStatusMessage;
-            Color statusColor = string.IsNullOrWhiteSpace(editorStatusMessage)
-                ? HudLabelColor
-                : (editorStatusIsError ? GameOverTitleColor : ScoreValueColor);
-            DrawCenteredText(statusLine, y: 44f, statusColor, scale: 1);
+            DrawEditorStatusLine("2-12 LETTERS OR NUMBERS");
 
             DrawOnScreenKeypad(allowPunctuation: true);
-            DrawCenteredText("SAVED ON DEVICE + CLOUD", y: 128f, HudLabelColor, scale: 1);
+            DrawCenteredText("SAVED ON DEVICE + CLOUD", y: 131f, HudLabelColor, scale: 1);
 
             string cancelLabel = (openedFromPostRunAutoPrompt && !hasCustom) ? "LATER" : "CANCEL";
-            DrawButton(cancelLabel, ModalCancelButton, isModalCancelHovered);
-            DrawButton(isProfileBusy ? "WAIT" : "SAVE", ModalConfirmButton, isModalConfirmHovered);
+            DrawButton(cancelLabel, NameCancelButton, isModalCancelHovered);
+            DrawButton(isProfileBusy ? "WAIT" : "SAVE", NameSaveButton, isModalConfirmHovered);
         }
 
         private void DrawSyncOverviewModal()
@@ -2057,31 +2190,31 @@ namespace BillusBucket
             string connectCode = leaderboardService?.PlayerConnectCode ?? "----";
             bool hasCustomName = leaderboardService != null && leaderboardService.HasCustomPlayerName;
 
-            DrawCenteredText("CLOUD SAVE + SYNC", y: 15f, WarmTitleColor, scale: 1);
-            DrawCenteredText("PLAYER: " + playerName, y: 28f, BestValueColor, scale: 1);
-            DrawCenteredText("YOUR 12-CHAR SAVE CODE:", y: 40f, HudLabelColor, scale: 1);
+            DrawCenteredText("CLOUD SAVE + SYNC", y: 17f, WarmTitleColor, scale: 1);
+            DrawCenteredText("PLAYER: " + playerName, y: 31f, BestValueColor, scale: 1);
+            DrawCenteredText("YOUR 12-CHAR SAVE CODE:", y: 43f, HudLabelColor, scale: 1);
 
-            Rectangle codeBox = new Rectangle(72, 50, 176, 20);
+            Rectangle codeBox = new Rectangle(72, 53, 176, 20);
             DrawRect(codeBox.X, codeBox.Y, codeBox.Width, codeBox.Height, PanelInkColor);
             DrawRect(codeBox.X + 1, codeBox.Y + 1, codeBox.Width - 2, codeBox.Height - 2, InputBoxFillColor);
             DrawRect(codeBox.X + 1, codeBox.Y + 1, codeBox.Width - 2, 1, PanelTimberColor);
             DrawRect(codeBox.X + 1, codeBox.Bottom - 2, codeBox.Width - 2, 1, PanelTopTrimColor);
-            DrawCenteredText(connectCode, y: 57f, ScoreValueColor, scale: 1);
+            DrawCenteredText(connectCode, y: 60f, ScoreValueColor, scale: 1);
 
             if (!string.IsNullOrWhiteSpace(syncStatusMessage))
             {
-                DrawCenteredText(syncStatusMessage, y: 76f, WarmTitleColor, scale: 1);
+                DrawCenteredText(syncStatusMessage, y: 80f, WarmTitleColor, scale: 1);
             }
             else if (!hasCustomName)
             {
-                DrawCenteredText("SET YOUR NAME FIRST TO SAVE", y: 76f, GameOverTitleColor, scale: 1);
+                DrawCenteredText("SET YOUR NAME FIRST TO SAVE", y: 80f, GameOverTitleColor, scale: 1);
             }
             else
             {
-                DrawCenteredText("USE CODE ON PHONE, PC OR WEB", y: 76f, HudLabelColor, scale: 1);
+                DrawCenteredText("USE CODE ON PHONE, PC OR WEB", y: 80f, HudLabelColor, scale: 1);
             }
 
-            DrawCenteredText("RESTORES NAME, BEST + RANK", y: 88f, HudLabelColor, scale: 1);
+            DrawCenteredText("RESTORES NAME, BEST + RANK", y: 92f, HudLabelColor, scale: 1);
 
             DrawButton("COPY CODE", SyncCopyButton, isSyncCopyHovered);
             DrawButton("ENTER CODE", SyncEnterCodeButton, isSyncEnterCodeHovered);
@@ -2090,27 +2223,32 @@ namespace BillusBucket
 
         private void DrawSyncEnterCodeModal()
         {
-            DrawCenteredText("ENTER SAVE CODE", y: 15f, WarmTitleColor, scale: 1);
+            DrawCenteredText("ENTER SAVE CODE", y: 17f, WarmTitleColor, scale: 1);
 
             string formattedCode = PlayerIdentityValidator.FormatPartialConnectCode(editorBuffer);
             DrawInputBox(
-                new Rectangle(72, 25, 176, 16),
+                new Rectangle(72, 27, 176, 16),
                 formattedCode,
                 showCursor: !isProfileBusy && editorBuffer.Length < PlayerIdentityValidator.ConnectCodeLength);
 
-            string statusLine = string.IsNullOrWhiteSpace(editorStatusMessage)
-                ? "TYPE 12 LETTERS OR NUMBERS"
-                : editorStatusMessage;
-            Color statusColor = string.IsNullOrWhiteSpace(editorStatusMessage)
-                ? HudLabelColor
-                : (editorStatusIsError ? GameOverTitleColor : ScoreValueColor);
-            DrawCenteredText(statusLine, y: 44f, statusColor, scale: 1);
+            DrawEditorStatusLine("TYPE 12 LETTERS OR NUMBERS");
 
             DrawOnScreenKeypad(allowPunctuation: false);
-            DrawCenteredText("LINKS YOUR CLOUD NAME + BEST", y: 128f, HudLabelColor, scale: 1);
+            DrawCenteredText("CTRL+V OR TAP PASTE", y: 131f, HudLabelColor, scale: 1);
 
-            DrawButton("CANCEL", ModalCancelButton, isModalCancelHovered);
-            DrawButton(isProfileBusy ? "WAIT" : "CONNECT", ModalConfirmButton, isModalConfirmHovered);
+            DrawButton("CANCEL", CodeCancelButton, isModalCancelHovered);
+            DrawButton("PASTE", CodePasteButton, isModalPasteHovered);
+            DrawButton(isProfileBusy ? "WAIT" : "CONNECT", CodeConnectButton, isModalConfirmHovered);
+        }
+
+        private void DrawEditorStatusLine(string defaultHint)
+        {
+            bool hasStatus = !string.IsNullOrWhiteSpace(editorStatusMessage);
+            string statusLine = hasStatus ? editorStatusMessage : defaultHint;
+            Color statusColor = !hasStatus
+                ? HudLabelColor
+                : (editorStatusIsError ? GameOverTitleColor : ScoreValueColor);
+            DrawCenteredText(statusLine, y: 47f, statusColor, scale: 1);
         }
 
         private void DrawInputBox(Rectangle box, string valueText, bool showCursor)
@@ -2178,7 +2316,7 @@ namespace BillusBucket
         private static KeypadKey[] BuildOnScreenKeypad()
         {
             const int startX = 61;
-            const int startY = 55;
+            const int startY = 57;
             const int keyWidth = 18;
             const int keyHeight = 15;
             const int stepX = 20;
