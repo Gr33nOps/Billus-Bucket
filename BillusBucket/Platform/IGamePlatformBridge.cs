@@ -45,6 +45,7 @@ namespace BillusBucket
         void NotifyLoadingFinished();
         void NotifyGameplayStart();
         void NotifyGameplayStop();
+        bool TryCopyTextToClipboard(string text) => false;
     }
 
     /// <summary>
@@ -149,6 +150,11 @@ namespace BillusBucket
 
             gameplayActive = false;
             inner.NotifyGameplayStop();
+        }
+
+        public bool TryCopyTextToClipboard(string text)
+        {
+            return inner.TryCopyTextToClipboard(text);
         }
     }
 }

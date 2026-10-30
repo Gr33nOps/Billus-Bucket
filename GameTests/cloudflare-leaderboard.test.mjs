@@ -334,12 +334,12 @@ test("rate limiting enforces 6 writes/min and atomic batch rolls back failed SQL
     ).get();
     assert.equal(leakedRuns.n, 0);
 
-    // Verify 7th write in the same minute returns 429
+    // Verify 9th write in the same minute returns 429 (MAX_WRITES_PER_MINUTE = 8)
     let nowMs = Date.parse("2026-10-30T11:00:10.000Z");
     const handler = createCloudflareLeaderboardHandler(() => nowMs);
     const env = { DB: db, PLAYER_HASH_SALT: TEST_SALT, ALLOWED_ORIGINS: "*" };
 
-    for (let i = 1; i <= 7; i++) {
+    for (let i = 1; i <= 9; i++) {
       const res = await handler(
         new Request("https://lb.example.workers.dev", {
           method: "POST",
@@ -358,7 +358,7 @@ test("rate limiting enforces 6 writes/min and atomic batch rolls back failed SQL
         }),
         env,
       );
-      assert.equal(res.status, i <= 6 ? 200 : 429);
+      assert.equal(res.status, i <= 8 ? 200 : 429);
     }
 
     // Next minute window resets write quota
@@ -371,10 +371,10 @@ test("rate limiting enforces 6 writes/min and atomic batch rolls back failed SQL
           "CF-Connecting-IP": "198.51.100.250",
         },
         body: JSON.stringify({
-          runId: "run-ratelimit-test-0008",
+          runId: "run-ratelimit-test-0010",
           playerId: "player-ratelimit-0001",
           displayName: "BILLU_7777",
-          score: "800",
+          score: "1000",
           durationSeconds: 10,
           platform: "web",
         }),
@@ -382,6 +382,190 @@ test("rate limiting enforces 6 writes/min and atomic batch rolls back failed SQL
       env,
     );
     assert.equal(afterWindowRes.status, 200);
+  } finally {
+    db.close();
+  }
+});
+
+test("custom player name rename in-place, profanity filter, cross-device Save Code sync, and v1->v2 SQL migration", async () => {
+  // 1. Verify 0002 migration preserves existing v1 weekly score (e.g. BILLU_9100 -> 15760)
+  const v1Db = new DatabaseSync(":memory:");
+  try {
+    v1Db.exec(`
+      CREATE TABLE weekly_leaderboard_scores (
+        week_start TEXT NOT NULL,
+        player_hash TEXT NOT NULL CHECK (length(player_hash) = 64),
+        display_name TEXT NOT NULL CHECK (length(display_name) BETWEEN 3 AND 12 AND display_name NOT GLOB '*[^A-Z0-9_]*'),
+        best_score INTEGER NOT NULL CHECK (best_score > 0 AND best_score <= 50000000 AND best_score % 10 = 0),
+        submitted_at TEXT NOT NULL,
+        source_platform TEXT NOT NULL CHECK (source_platform IN ('local', 'web', 'crazygames', 'poki', 'desktop')),
+        PRIMARY KEY (week_start, player_hash)
+      ) STRICT;
+    `);
+    v1Db.prepare(
+      "INSERT INTO weekly_leaderboard_scores VALUES (?, ?, ?, ?, ?, ?)",
+    ).run(
+      "2026-10-26T09:00:00.000Z",
+      "a".repeat(64),
+      "BILLU_9100",
+      15760,
+      "2026-10-30T08:00:00.000Z",
+      "web",
+    );
+    v1Db.exec(
+      fs.readFileSync(
+        "backend/cloudflare/migrations/0002_profiles_and_custom_names.sql",
+        "utf8",
+      ),
+    );
+    const preserved = v1Db.prepare(
+      "SELECT display_name, best_score FROM weekly_leaderboard_scores",
+    ).get();
+    assert.equal(preserved.display_name, "BILLU_9100");
+    assert.equal(preserved.best_score, 15760);
+
+    // Confirm upgraded constraints accept 2-letter custom names and 'android'/'ios'
+    v1Db.prepare(
+      "INSERT INTO weekly_leaderboard_scores VALUES (?, ?, ?, ?, ?, ?)",
+    ).run(
+      "2026-10-26T09:00:00.000Z",
+      "b".repeat(64),
+      "AJ",
+      500,
+      "2026-10-30T08:05:00.000Z",
+      "android",
+    );
+  } finally {
+    v1Db.close();
+  }
+
+  // 2. End-to-end rename + cross-device Save Code restore
+  const db = createD1SqliteMock();
+  try {
+    let nowMs = Date.parse("2026-10-30T09:30:00.000Z");
+    const handler = createCloudflareLeaderboardHandler(() => nowMs);
+    const env = { DB: db, PLAYER_HASH_SALT: TEST_SALT, ALLOWED_ORIGINS: "*" };
+
+    const legacyDevicePlayerId = "9f8e7d6c5b4a39281706f5e4d3c2b1a0";
+    const connectCode = "K7M9-P4X2-R8W3";
+
+    // Device A plays first run before choosing a custom name
+    const run1 = await handler(
+      new Request("https://lb.example.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.5" },
+        body: JSON.stringify({
+          runId: "run-device-a-first-0001",
+          playerId: legacyDevicePlayerId,
+          displayName: "BILLU_9100",
+          score: "15760",
+          durationSeconds: 35,
+          platform: "web",
+        }),
+      }),
+      env,
+    );
+    assert.equal(run1.status, 200);
+
+    // Profane name is rejected with 400
+    const badNameRes = await handler(
+      new Request("https://lb.example.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.5" },
+        body: JSON.stringify({
+          action: "save_profile",
+          playerId: legacyDevicePlayerId,
+          connectCode,
+          displayName: "F_U_C_K",
+          personalBest: "15760",
+          platform: "web",
+        }),
+      }),
+      env,
+    );
+    assert.equal(badNameRes.status, 400);
+
+    // Valid custom name renames BILLU_9100 -> GREEN in-place on the live weekly board!
+    const saveRes = await handler(
+      new Request("https://lb.example.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.5" },
+        body: JSON.stringify({
+          action: "save_profile",
+          playerId: legacyDevicePlayerId,
+          connectCode,
+          displayName: "Green",
+          personalBest: "15760",
+          platform: "web",
+        }),
+      }),
+      env,
+    );
+    assert.equal(saveRes.status, 200);
+    const saveJson = await saveRes.json();
+    assert.equal(saveJson.displayName, "GREEN");
+    assert.equal(saveJson.entries.length, 1);
+    assert.equal(saveJson.entries[0].displayName, "GREEN");
+    assert.equal(saveJson.entries[0].score, "15760");
+
+    // Unknown Save Code returns 404
+    const missingRestore = await handler(
+      new Request("https://lb.example.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "198.51.100.77" },
+        body: JSON.stringify({
+          action: "restore_profile",
+          connectCode: "ZZZZ-ZZZZ-ZZZZ",
+          platform: "android",
+        }),
+      }),
+      env,
+    );
+    assert.equal(missingRestore.status, 404);
+
+    // Device B (e.g. Android phone) restores using K7M9-P4X2-R8W3
+    const restoreRes = await handler(
+      new Request("https://lb.example.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "198.51.100.77" },
+        body: JSON.stringify({
+          action: "restore_profile",
+          connectCode: "k7m9-p4x2-r8w3",
+          platform: "android",
+        }),
+      }),
+      env,
+    );
+    assert.equal(restoreRes.status, 200);
+    const restored = await restoreRes.json();
+    assert.equal(restored.found, true);
+    assert.equal(restored.displayName, "GREEN");
+    assert.equal(restored.personalBest, "15760");
+    assert.equal(restored.playerRank, 1);
+
+    // Device B beats the score using K7M9-P4X2-R8W3 -> updates the SAME single player row!
+    nowMs += 10_000;
+    const phoneRun = await handler(
+      new Request("https://lb.example.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "198.51.100.77" },
+        body: JSON.stringify({
+          runId: "run-device-b-phone-0002",
+          playerId: connectCode,
+          displayName: "GREEN",
+          score: "22500",
+          durationSeconds: 45,
+          platform: "android",
+        }),
+      }),
+      env,
+    );
+    assert.equal(phoneRun.status, 200);
+    const phoneJson = await phoneRun.json();
+    assert.equal(phoneJson.entries.length, 1);
+    assert.equal(phoneJson.entries[0].displayName, "GREEN");
+    assert.equal(phoneJson.entries[0].score, "22500");
+    assert.equal(phoneJson.personalBest, "22500");
   } finally {
     db.close();
   }

@@ -7,7 +7,8 @@ namespace BillusBucket
 {
     /// <summary>
     /// Default/offline leaderboard adapter.
-    /// Tracks personal best locally, tolerates restricted storage, and never fabricates global rankings.
+    /// Tracks personal best and custom player name locally, tolerates restricted storage,
+    /// and never fabricates global rankings.
     /// </summary>
     public sealed class LocalLeaderboardService : ILeaderboardService
     {
@@ -17,6 +18,9 @@ namespace BillusBucket
         private readonly HashSet<string> submittedRuns = new HashSet<string>(StringComparer.Ordinal);
         private readonly Queue<string> submittedRunOrder = new Queue<string>();
         private BigInteger personalBest;
+        private string fallbackSessionName;
+        private string fallbackSessionCode;
+        private bool fallbackHasCustomName;
 
         public LeaderboardCapabilities Capabilities { get; } = new LeaderboardCapabilities(
             providerName: "LOCAL",
@@ -26,6 +30,10 @@ namespace BillusBucket
             supportsPlayerRank: false);
 
         public LeaderboardSnapshot CurrentSnapshot { get; private set; }
+
+        public string PlayerDisplayName => SafeGetDisplayName();
+        public bool HasCustomPlayerName => SafeHasCustomName();
+        public string PlayerConnectCode => SafeGetConnectCode();
 
         public LocalLeaderboardService(ILocalScoreStorage storage)
         {
@@ -111,6 +119,57 @@ namespace BillusBucket
                 message: CurrentSnapshot.StatusMessage));
         }
 
+        public Task<ProfileSyncResult> UpdatePlayerNameAsync(string newDisplayName)
+        {
+            if (!PlayerIdentityValidator.TryValidateCustomName(newDisplayName, out string validName, out string error))
+            {
+                return Task.FromResult(new ProfileSyncResult(
+                    accepted: false,
+                    syncedOnline: false,
+                    displayName: PlayerDisplayName,
+                    personalBest: personalBest,
+                    message: error));
+            }
+
+            fallbackSessionName = validName;
+            fallbackHasCustomName = true;
+            try
+            {
+                storage.SaveCustomDisplayName(validName);
+            }
+            catch
+            {
+            }
+
+            CurrentSnapshot = BuildSnapshot();
+            return Task.FromResult(new ProfileSyncResult(
+                accepted: true,
+                syncedOnline: false,
+                displayName: validName,
+                personalBest: personalBest,
+                message: "NAME SAVED ON DEVICE"));
+        }
+
+        public Task<ProfileSyncResult> RestoreProfileByCodeAsync(string connectCode)
+        {
+            if (!PlayerIdentityValidator.TryNormalizeConnectCode(connectCode, out _))
+            {
+                return Task.FromResult(new ProfileSyncResult(
+                    accepted: false,
+                    syncedOnline: false,
+                    displayName: PlayerDisplayName,
+                    personalBest: personalBest,
+                    message: "ENTER 12-CHAR SAVE CODE"));
+            }
+
+            return Task.FromResult(new ProfileSyncResult(
+                accepted: false,
+                syncedOnline: false,
+                displayName: PlayerDisplayName,
+                personalBest: personalBest,
+                message: "CLOUD SYNC OFFLINE"));
+        }
+
         public Task<LeaderboardSnapshot> RefreshRankingsAsync()
         {
             personalBest = BigInteger.Max(personalBest, SafeLoadPersonalBest());
@@ -126,7 +185,6 @@ namespace BillusBucket
             }
             catch
             {
-                // Restricted storage must never interrupt gameplay.
             }
         }
 
@@ -168,7 +226,50 @@ namespace BillusBucket
             }
             catch
             {
-                // Keep score in memory for the active session when storage is blocked.
+            }
+        }
+
+        private string SafeGetDisplayName()
+        {
+            try
+            {
+                return storage.GetOrCreateSafeDisplayName();
+            }
+            catch
+            {
+                if (string.IsNullOrWhiteSpace(fallbackSessionName))
+                {
+                    fallbackSessionName = "BILLU_1000";
+                }
+                return fallbackSessionName;
+            }
+        }
+
+        private bool SafeHasCustomName()
+        {
+            try
+            {
+                return storage.HasCustomDisplayName;
+            }
+            catch
+            {
+                return fallbackHasCustomName;
+            }
+        }
+
+        private string SafeGetConnectCode()
+        {
+            try
+            {
+                return storage.GetOrCreateConnectCode();
+            }
+            catch
+            {
+                if (string.IsNullOrWhiteSpace(fallbackSessionCode))
+                {
+                    fallbackSessionCode = PlayerIdentityValidator.CreateConnectCode();
+                }
+                return fallbackSessionCode;
             }
         }
 

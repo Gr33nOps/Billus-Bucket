@@ -82,7 +82,7 @@ namespace BillusBucket
 
                 bool isLetter = c >= 'A' && c <= 'Z';
                 bool isDigit = c >= '0' && c <= '9';
-                if (isLetter || isDigit || c == '_')
+                if (isLetter || isDigit || c == '_' || c == '-')
                 {
                     cleaned.Append(c);
                 }

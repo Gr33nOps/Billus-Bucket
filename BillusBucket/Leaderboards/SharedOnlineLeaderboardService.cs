@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 namespace BillusBucket
 {
     /// <summary>
-    /// Shared weekly online leaderboard adapter backed by an approved endpoint (such as Supabase Edge Functions).
-    /// Always saves personal best locally first and degrades cleanly to local mode whenever offline.
+    /// Shared weekly online leaderboard & cloud profile adapter backed by Cloudflare Workers + D1 (or Supabase).
+    /// Always saves personal best and custom name locally first, syncs to the cloud,
+    /// supports cross-device Save Codes, and degrades cleanly to local mode whenever offline.
     /// </summary>
     public sealed class SharedOnlineLeaderboardService : ILeaderboardService
     {
@@ -23,10 +24,17 @@ namespace BillusBucket
         private int? currentWeeklyRank;
         private IReadOnlyList<LeaderboardRankEntry> weeklyTop10 = Array.Empty<LeaderboardRankEntry>();
         private bool isOnlineAvailable;
+        private string fallbackSessionName;
+        private string fallbackSessionCode;
+        private bool fallbackHasCustomName;
 
         public LeaderboardCapabilities Capabilities { get; }
 
         public LeaderboardSnapshot CurrentSnapshot { get; private set; }
+
+        public string PlayerDisplayName => SafeGetDisplayName();
+        public bool HasCustomPlayerName => SafeHasCustomName();
+        public string PlayerConnectCode => SafeGetConnectCode();
 
         public SharedOnlineLeaderboardService(
             ILocalScoreStorage storage,
@@ -139,11 +147,13 @@ namespace BillusBucket
                 displayName: SafeGetDisplayName(),
                 score: finalScore,
                 runDurationSeconds: runDurationSeconds,
-                sourcePlatform: sourcePlatform);
+                sourcePlatform: sourcePlatform,
+                connectCode: SafeGetConnectCode());
 
             SharedLeaderboardRemoteResponse remote = await transport.SubmitScoreAsync(payload);
             if (remote.Success)
             {
+                ApplyRemoteProfileSyncIfPresent(remote);
                 isOnlineAvailable = true;
                 currentWeeklyRank = remote.PlayerWeeklyRank ?? currentWeeklyRank;
                 if (remote.Top10.Count > 0)
@@ -196,6 +206,141 @@ namespace BillusBucket
                 message: fallbackStatus);
         }
 
+        public async Task<ProfileSyncResult> UpdatePlayerNameAsync(string newDisplayName)
+        {
+            if (!PlayerIdentityValidator.TryValidateCustomName(newDisplayName, out string validName, out string error))
+            {
+                return new ProfileSyncResult(
+                    accepted: false,
+                    syncedOnline: false,
+                    displayName: PlayerDisplayName,
+                    personalBest: personalBest,
+                    weeklyRank: currentWeeklyRank,
+                    message: error);
+            }
+
+            fallbackSessionName = validName;
+            fallbackHasCustomName = true;
+            try
+            {
+                storage.SaveCustomDisplayName(validName);
+            }
+            catch
+            {
+            }
+
+            SharedProfileSavePayload payload = new SharedProfileSavePayload(
+                anonymousPlayerId: SafeGetPlayerId(),
+                connectCode: SafeGetConnectCode(),
+                displayName: validName,
+                personalBest: personalBest,
+                sourcePlatform: sourcePlatform);
+
+            SharedLeaderboardRemoteResponse remote = await transport.SaveProfileAsync(payload);
+            if (remote.Success)
+            {
+                ApplyRemoteProfileSyncIfPresent(remote);
+                isOnlineAvailable = true;
+                currentWeeklyRank = remote.PlayerWeeklyRank ?? currentWeeklyRank;
+                weeklyTop10 = remote.Top10;
+
+                string status = weeklyTop10.Count > 0 ? "WEEKLY TOP 10" : "NO WEEKLY SCORES YET";
+                CurrentSnapshot = new LeaderboardSnapshot(
+                    personalBest: personalBest,
+                    currentPlayerWeeklyRank: currentWeeklyRank,
+                    weeklyTop10: weeklyTop10,
+                    isLoading: false,
+                    isOnlineAvailable: true,
+                    statusMessage: status);
+
+                return new ProfileSyncResult(
+                    accepted: true,
+                    syncedOnline: true,
+                    displayName: validName,
+                    personalBest: personalBest,
+                    weeklyRank: currentWeeklyRank,
+                    message: "SAVED TO CLOUD AS " + validName);
+            }
+
+            return new ProfileSyncResult(
+                accepted: true,
+                syncedOnline: false,
+                displayName: validName,
+                personalBest: personalBest,
+                weeklyRank: currentWeeklyRank,
+                message: string.IsNullOrWhiteSpace(remote.ErrorMessage) ? "SAVED ON DEVICE" : remote.ErrorMessage);
+        }
+
+        public async Task<ProfileSyncResult> RestoreProfileByCodeAsync(string connectCode)
+        {
+            if (!PlayerIdentityValidator.TryNormalizeConnectCode(connectCode, out string formattedCode))
+            {
+                return new ProfileSyncResult(
+                    accepted: false,
+                    syncedOnline: false,
+                    displayName: PlayerDisplayName,
+                    personalBest: personalBest,
+                    weeklyRank: currentWeeklyRank,
+                    message: "ENTER 12-CHAR SAVE CODE");
+            }
+
+            SharedLeaderboardRemoteResponse remote = await transport.RestoreProfileAsync(formattedCode, sourcePlatform);
+            if (!remote.Success)
+            {
+                string err = string.IsNullOrWhiteSpace(remote.ErrorMessage)
+                    ? "SAVE CODE NOT FOUND"
+                    : remote.ErrorMessage;
+                return new ProfileSyncResult(
+                    accepted: false,
+                    syncedOnline: false,
+                    displayName: PlayerDisplayName,
+                    personalBest: personalBest,
+                    weeklyRank: currentWeeklyRank,
+                    message: err);
+            }
+
+            string restoredName = !string.IsNullOrWhiteSpace(remote.ProfileDisplayName)
+                ? remote.ProfileDisplayName
+                : PlayerDisplayName;
+            BigInteger restoredBest = remote.ProfilePersonalBest.HasValue
+                ? BigInteger.Max(personalBest, remote.ProfilePersonalBest.Value)
+                : personalBest;
+
+            fallbackSessionCode = formattedCode;
+            fallbackSessionName = restoredName;
+            fallbackHasCustomName = !AnonymousPlayerIdentity.IsAutoGeneratedName(restoredName);
+            personalBest = restoredBest;
+
+            try
+            {
+                storage.ApplyRestoredProfile(formattedCode, restoredName, restoredBest);
+            }
+            catch
+            {
+            }
+
+            isOnlineAvailable = true;
+            currentWeeklyRank = remote.PlayerWeeklyRank;
+            weeklyTop10 = remote.Top10;
+
+            string status = weeklyTop10.Count > 0 ? "WEEKLY TOP 10" : "NO WEEKLY SCORES YET";
+            CurrentSnapshot = new LeaderboardSnapshot(
+                personalBest: personalBest,
+                currentPlayerWeeklyRank: currentWeeklyRank,
+                weeklyTop10: weeklyTop10,
+                isLoading: false,
+                isOnlineAvailable: true,
+                statusMessage: status);
+
+            return new ProfileSyncResult(
+                accepted: true,
+                syncedOnline: true,
+                displayName: restoredName,
+                personalBest: personalBest,
+                weeklyRank: currentWeeklyRank,
+                message: "CONNECTED AS " + restoredName);
+        }
+
         public async Task<LeaderboardSnapshot> RefreshRankingsAsync()
         {
             personalBest = BigInteger.Max(personalBest, SafeLoadPersonalBest());
@@ -213,6 +358,7 @@ namespace BillusBucket
 
             if (remote.Success)
             {
+                ApplyRemoteProfileSyncIfPresent(remote);
                 isOnlineAvailable = true;
                 currentWeeklyRank = remote.PlayerWeeklyRank;
                 weeklyTop10 = remote.Top10;
@@ -256,6 +402,30 @@ namespace BillusBucket
             }
             catch
             {
+            }
+        }
+
+        private void ApplyRemoteProfileSyncIfPresent(SharedLeaderboardRemoteResponse remote)
+        {
+            if (remote.ProfilePersonalBest.HasValue && remote.ProfilePersonalBest.Value > personalBest)
+            {
+                personalBest = remote.ProfilePersonalBest.Value;
+                SafeSavePersonalBest(personalBest, flushImmediately: true);
+            }
+
+            if (!string.IsNullOrWhiteSpace(remote.ProfileDisplayName) &&
+                !SafeHasCustomName() &&
+                !AnonymousPlayerIdentity.IsAutoGeneratedName(remote.ProfileDisplayName))
+            {
+                fallbackSessionName = remote.ProfileDisplayName;
+                fallbackHasCustomName = true;
+                try
+                {
+                    storage.SaveCustomDisplayName(remote.ProfileDisplayName);
+                }
+                catch
+                {
+                }
             }
         }
 
@@ -308,7 +478,7 @@ namespace BillusBucket
             }
             catch
             {
-                return "ANONYMOUS";
+                return SafeGetConnectCode();
             }
         }
 
@@ -320,7 +490,39 @@ namespace BillusBucket
             }
             catch
             {
-                return "PLAYER";
+                if (string.IsNullOrWhiteSpace(fallbackSessionName))
+                {
+                    fallbackSessionName = "BILLU_1000";
+                }
+                return fallbackSessionName;
+            }
+        }
+
+        private bool SafeHasCustomName()
+        {
+            try
+            {
+                return storage.HasCustomDisplayName;
+            }
+            catch
+            {
+                return fallbackHasCustomName;
+            }
+        }
+
+        private string SafeGetConnectCode()
+        {
+            try
+            {
+                return storage.GetOrCreateConnectCode();
+            }
+            catch
+            {
+                if (string.IsNullOrWhiteSpace(fallbackSessionCode))
+                {
+                    fallbackSessionCode = PlayerIdentityValidator.CreateConnectCode();
+                }
+                return fallbackSessionCode;
             }
         }
     }

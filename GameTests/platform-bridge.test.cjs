@@ -4,9 +4,10 @@ const vm = require("node:vm");
 const fs = require("node:fs");
 function setup(view = null) {
   let queued;
+  let copiedClipboardText = null;
   const error = { style: { display: "none" } };
   const overlay = { style: { display: "block" } };
-  const canvas = { width: 0, height: 0, style: {}, addEventListener() {} };
+  const canvas = { width: 0, height: 0, style: {}, addEventListener() {}, focus() {} };
   const holder = {
     style: {},
     clientWidth: view?.width,
@@ -27,6 +28,14 @@ function setup(view = null) {
     window: {
       innerWidth: view?.width,
       innerHeight: view?.height,
+      navigator: {
+        clipboard: {
+          writeText(value) {
+            copiedClipboardText = value;
+            return Promise.resolve();
+          },
+        },
+      },
       matchMedia() {
         return { matches: Boolean(view?.mobile) };
       },
@@ -79,6 +88,7 @@ function setup(view = null) {
     error,
     overlay,
     canvas,
+    getCopiedText: () => copiedClipboardText,
     tick() {
       const f = queued;
       queued = null;
@@ -136,4 +146,11 @@ test("mobile uses smaller viewport measurement and reserves a bottom margin", ()
   const bounds = s.api.getGameViewport();
   assert(bounds.y >= 8);
   assert(bounds.y + bounds.height <= 268);
+});
+
+test("copyTextToClipboard copies Save Code cleanly and rejects empty input", () => {
+  const s = setup();
+  assert.equal(s.api.copyTextToClipboard(""), false);
+  assert.equal(s.api.copyTextToClipboard("  K7P4-M9X2-W3R8  "), true);
+  assert.equal(s.getCopiedText(), "K7P4-M9X2-W3R8");
 });

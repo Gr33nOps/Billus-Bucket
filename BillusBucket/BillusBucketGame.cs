@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 // Alias BigInteger so System.Numerics.Vector2 does not collide with MonoGame's Vector2.
 using BigInteger = System.Numerics.BigInteger;
 using Microsoft.Xna.Framework;
@@ -19,12 +20,37 @@ namespace BillusBucket
     /// </summary>
     public sealed class BillusBucketGame : Game
     {
+        private enum LeaderboardSubView
+        {
+            Rankings,
+            EditName,
+            SyncOverview,
+            SyncEnterCode
+        }
+
+        private readonly struct KeypadKey
+        {
+            public string Label { get; }
+            public char Character { get; }
+            public bool IsBackspace { get; }
+            public ButtonBounds Bounds { get; }
+
+            public KeypadKey(string label, char character, bool isBackspace, ButtonBounds bounds)
+            {
+                Label = label;
+                Character = character;
+                IsBackspace = isBackspace;
+                Bounds = bounds;
+            }
+        }
+
         // Gameplay tuning and layout constants
         private const float MaxFrameDeltaSeconds = 0.05f;
         private const float InitialSpawnDelaySeconds = 0.25f;
         private const float ExplosionDurationSeconds = 0.85f;
         private const float ScreenFlashDuration = 0.22f;
         private const float ScreenFlashFadeSpeed = 0.9f;
+        private const float ToastDurationSeconds = 3.6f;
 
         private const int PlayerCollisionWidth = 24;
         private const int CatchBoxHalfWidth = 13;
@@ -51,6 +77,34 @@ namespace BillusBucket
         private static readonly ButtonBounds SfxButton = new ButtonBounds(292, 50, 20, 16);
         private static readonly ButtonBounds LeaderboardIconButton = RoundFlow.TopRightLeaderboardButton;
 
+        // Leaderboard, Custom Name, and Cloud Sync button hitboxes (inside x = 50..270 playfield column)
+        private static readonly ButtonBounds LeaderboardNameButton = new ButtonBounds(52, 148, 68, 18);
+        private static readonly ButtonBounds LeaderboardSyncButton = new ButtonBounds(200, 148, 68, 18);
+        private static readonly ButtonBounds ModalCancelButton = new ButtonBounds(86, 148, 68, 18);
+        private static readonly ButtonBounds ModalConfirmButton = new ButtonBounds(166, 148, 68, 18);
+        private static readonly ButtonBounds SyncCopyButton = new ButtonBounds(58, 104, 96, 18);
+        private static readonly ButtonBounds SyncEnterCodeButton = new ButtonBounds(166, 104, 96, 18);
+        private static readonly KeypadKey[] OnScreenKeypad = BuildOnScreenKeypad();
+
+        private static readonly Keys[] LetterKeys =
+        {
+            Keys.A, Keys.B, Keys.C, Keys.D, Keys.E, Keys.F, Keys.G, Keys.H, Keys.I,
+            Keys.J, Keys.K, Keys.L, Keys.M, Keys.N, Keys.O, Keys.P, Keys.Q, Keys.R,
+            Keys.S, Keys.T, Keys.U, Keys.V, Keys.W, Keys.X, Keys.Y, Keys.Z
+        };
+
+        private static readonly Keys[] TopDigitKeys =
+        {
+            Keys.D0, Keys.D1, Keys.D2, Keys.D3, Keys.D4,
+            Keys.D5, Keys.D6, Keys.D7, Keys.D8, Keys.D9
+        };
+
+        private static readonly Keys[] NumPadDigitKeys =
+        {
+            Keys.NumPad0, Keys.NumPad1, Keys.NumPad2, Keys.NumPad3, Keys.NumPad4,
+            Keys.NumPad5, Keys.NumPad6, Keys.NumPad7, Keys.NumPad8, Keys.NumPad9
+        };
+
         // UI palette colors (matched to tools/draw_assets.lua & ui-sign.png)
         private static readonly Color HudLabelColor = new Color(192, 180, 199);
         private static readonly Color ScoreValueColor = new Color(185, 220, 131);
@@ -68,6 +122,14 @@ namespace BillusBucket
         private static readonly Color PanelTopTrimColor = new Color(173, 128, 128);
         private static readonly Color PanelTopGlintColor = new Color(193, 148, 135);
         private static readonly Color PanelBottomTrimColor = new Color(154, 115, 118);
+
+        private static readonly Color InputBoxFillColor = new Color(49, 41, 56);
+        private static readonly Color KeyFillColor = new Color(52, 83, 111);
+        private static readonly Color KeyHoverFillColor = new Color(60, 134, 167);
+        private static readonly Color KeyHighlightColor = new Color(119, 183, 200);
+        private static readonly Color KeyHoverHighlightColor = new Color(155, 200, 207);
+        private static readonly Color KeyDeleteFillColor = new Color(114, 86, 97);
+        private static readonly Color KeyDisabledFillColor = new Color(64, 55, 68);
 
         // Platform & asset abstractions (shared across DesktopGL and Browser WebAssembly)
         private readonly IAssetStreamProvider assetProvider;
@@ -114,6 +176,13 @@ namespace BillusBucket
         private bool isMainButtonHovered;
         private bool isLeaderboardButtonHovered;
         private bool isBackButtonHovered;
+        private bool isLeaderboardNameHovered;
+        private bool isLeaderboardSyncHovered;
+        private bool isModalCancelHovered;
+        private bool isModalConfirmHovered;
+        private bool isSyncCopyHovered;
+        private bool isSyncEnterCodeHovered;
+        private int hoveredKeypadIndex = -1;
 
         // Mute flags are stored here so the UI buttons still toggle when no audio hardware is present.
         private bool musicMuted;
@@ -122,6 +191,7 @@ namespace BillusBucket
         // Timers, per-run submission tracking, and summary values
         private string currentRunId = string.Empty;
         private bool hasSubmittedCurrentRun;
+        private Task activeRunSubmissionTask = Task.CompletedTask;
         private float elapsed;
         private float ambientTime;
         private float spawnTimer;
@@ -130,7 +200,25 @@ namespace BillusBucket
         private BigInteger lastRunCash;
         private BigInteger bestKnownCash;
 
+        // Player custom name & cross-device Cloud Sync UI state
+        private LeaderboardSubView leaderboardSubView = LeaderboardSubView.Rankings;
+        private bool hasAutoPromptedForName;
+        private bool openedFromPostRunAutoPrompt;
+        private bool hasBackedUpCustomProfileThisSession;
+        private bool isProfileBusy;
+        private string editorBuffer = string.Empty;
+        private string editorStatusMessage = string.Empty;
+        private bool editorStatusIsError;
+        private string syncStatusMessage = string.Empty;
+        private string rankingsToastMessage = string.Empty;
+        private float rankingsToastTimer;
+
         private RoundPhase CurrentPhase => flow.Phase;
+
+        private bool IsTypingInKeypadModal =>
+            flow.IsLeaderboardOpen &&
+            (leaderboardSubView == LeaderboardSubView.EditName ||
+             leaderboardSubView == LeaderboardSubView.SyncEnterCode);
 
         public BillusBucketGame(
             string reviewDirectory = null,
@@ -218,6 +306,7 @@ namespace BillusBucket
             }
 
             bestKnownCash = leaderboardService.GetPersonalBest();
+            hasAutoPromptedForName = leaderboardService.HasCustomPlayerName;
             run = new BillusBucketRun(bestKnownCash);
 
             if (!reviewTools.IsArtReviewMode)
@@ -296,6 +385,8 @@ namespace BillusBucket
             SyncTouchPanelDisplaySize();
 
             float dt = Math.Min(MaxFrameDeltaSeconds, (float)gameTime.ElapsedGameTime.TotalSeconds);
+            rankingsToastTimer = Math.Max(0f, rankingsToastTimer - dt);
+
             KeyboardState keys = Keyboard.GetState();
             MouseState mouse = Mouse.GetState();
             TouchCollection touch = TouchPanel.GetState();
@@ -382,7 +473,8 @@ namespace BillusBucket
                 }
             }
 
-            if (WasKeyJustPressed(keys, Keys.M))
+            // Do not mute audio when the player types the letter 'M' in their name or Save Code!
+            if (!IsTypingInKeypadModal && WasKeyJustPressed(keys, Keys.M))
             {
                 bool bothCurrentlyMuted = musicMuted && sfxMuted;
                 bool shouldMuteBoth = !bothCurrentlyMuted;
@@ -439,7 +531,18 @@ namespace BillusBucket
             {
                 if (explosionTimer <= 0f)
                 {
-                    if (CheckLeaderboardOpenInput(keys, mouse, touch, clicked, tapped, canvasViewport))
+                    // Prompt once after the player's first scored run finishes its explosion animation
+                    // if they haven't chosen a custom player name yet.
+                    if (!hasAutoPromptedForName &&
+                        lastRunCash > BigInteger.Zero &&
+                        leaderboardService != null &&
+                        !leaderboardService.HasCustomPlayerName &&
+                        !reviewTools.IsLiveReviewMode)
+                    {
+                        hasAutoPromptedForName = true;
+                        OpenLeaderboardScreen(autoOpenNameEditor: true, fromPostRunPrompt: true);
+                    }
+                    else if (CheckLeaderboardOpenInput(keys, mouse, touch, clicked, tapped, canvasViewport))
                     {
                         OpenLeaderboardScreen();
                     }
@@ -493,13 +596,20 @@ namespace BillusBucket
             isMainButtonHovered = false;
             isLeaderboardButtonHovered = false;
             isBackButtonHovered = false;
+            isLeaderboardNameHovered = false;
+            isLeaderboardSyncHovered = false;
+            isModalCancelHovered = false;
+            isModalConfirmHovered = false;
+            isSyncCopyHovered = false;
+            isSyncEnterCodeHovered = false;
+            hoveredKeypadIndex = -1;
         }
 
         private void UpdateButtonHoverStates(MouseState mouse, Rectangle canvasViewport)
         {
+            ClearHoverStates();
             if (!IsInsideCanvas(mouse.X, mouse.Y, canvasViewport))
             {
-                ClearHoverStates();
                 return;
             }
 
@@ -512,7 +622,49 @@ namespace BillusBucket
             isLeaderboardButtonHovered =
                 canUseLeaderboardIcon &&
                 LeaderboardIconButton.Contains(mouseCanvas.X, mouseCanvas.Y);
-            isBackButtonHovered = flow.BackButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+
+            if (!flow.IsLeaderboardOpen)
+            {
+                return;
+            }
+
+            if (leaderboardSubView == LeaderboardSubView.Rankings)
+            {
+                isLeaderboardNameHovered = LeaderboardNameButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+                isBackButtonHovered = flow.BackButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+                isLeaderboardSyncHovered = LeaderboardSyncButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+            }
+            else if (leaderboardSubView == LeaderboardSubView.SyncOverview)
+            {
+                isSyncCopyHovered = SyncCopyButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+                isSyncEnterCodeHovered = SyncEnterCodeButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+                isBackButtonHovered = flow.BackButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+            }
+            else if (leaderboardSubView == LeaderboardSubView.EditName ||
+                     leaderboardSubView == LeaderboardSubView.SyncEnterCode)
+            {
+                isModalCancelHovered = !isProfileBusy && ModalCancelButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+                isModalConfirmHovered = !isProfileBusy && ModalConfirmButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+
+                if (!isProfileBusy)
+                {
+                    bool allowPunctuation = leaderboardSubView == LeaderboardSubView.EditName;
+                    for (int i = 0; i < OnScreenKeypad.Length; i++)
+                    {
+                        KeypadKey key = OnScreenKeypad[i];
+                        if (!allowPunctuation && !key.IsBackspace && (key.Character == '_' || key.Character == '-'))
+                        {
+                            continue;
+                        }
+
+                        if (key.Bounds.Contains(mouseCanvas.X, mouseCanvas.Y))
+                        {
+                            hoveredKeypadIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         private void SaveInputState(KeyboardState keys, MouseState mouse, bool touchDown)
@@ -601,6 +753,91 @@ namespace BillusBucket
             return false;
         }
 
+        // =====================================================================
+        // Leaderboard, Custom Player Name & Cross-Device Cloud Sync Input
+        // =====================================================================
+
+        private void OpenLeaderboardScreen(bool autoOpenNameEditor = false, bool fromPostRunPrompt = false)
+        {
+            if (!flow.OpenLeaderboard())
+            {
+                return;
+            }
+
+            bool shouldPromptForName =
+                autoOpenNameEditor ||
+                (!hasAutoPromptedForName &&
+                 leaderboardService != null &&
+                 !leaderboardService.HasCustomPlayerName &&
+                 !reviewTools.IsLiveReviewMode);
+
+            if (shouldPromptForName)
+            {
+                hasAutoPromptedForName = true;
+                BeginNameEditor(fromPostRunPrompt);
+            }
+            else
+            {
+                leaderboardSubView = LeaderboardSubView.Rankings;
+                openedFromPostRunAutoPrompt = false;
+            }
+
+            audio?.Play(GameAudio.SoundToggle);
+            RefreshLeaderboardInBackground();
+        }
+
+        private void CloseLeaderboardScreen()
+        {
+            if (flow.CloseLeaderboard())
+            {
+                leaderboardSubView = LeaderboardSubView.Rankings;
+                openedFromPostRunAutoPrompt = false;
+                audio?.Play(GameAudio.SoundToggle);
+            }
+        }
+
+        private void BeginNameEditor(bool fromPostRunPrompt)
+        {
+            leaderboardSubView = LeaderboardSubView.EditName;
+            openedFromPostRunAutoPrompt = fromPostRunPrompt;
+            isProfileBusy = false;
+            editorStatusMessage = string.Empty;
+            editorStatusIsError = false;
+
+            if (leaderboardService != null && leaderboardService.HasCustomPlayerName)
+            {
+                editorBuffer = leaderboardService.PlayerDisplayName ?? string.Empty;
+            }
+            else
+            {
+                editorBuffer = string.Empty;
+            }
+        }
+
+        private void OpenSyncOverview()
+        {
+            leaderboardSubView = LeaderboardSubView.SyncOverview;
+            openedFromPostRunAutoPrompt = false;
+            isProfileBusy = false;
+            syncStatusMessage = string.Empty;
+
+            if (!hasBackedUpCustomProfileThisSession &&
+                leaderboardService != null &&
+                leaderboardService.HasCustomPlayerName)
+            {
+                EnsureCustomProfileSyncedInBackground();
+            }
+        }
+
+        private void BeginSyncEnterCode()
+        {
+            leaderboardSubView = LeaderboardSubView.SyncEnterCode;
+            isProfileBusy = false;
+            editorBuffer = string.Empty;
+            editorStatusMessage = string.Empty;
+            editorStatusIsError = false;
+        }
+
         private void UpdateLeaderboardScreenInput(
             KeyboardState keys,
             MouseState mouse,
@@ -609,47 +846,314 @@ namespace BillusBucket
             bool tapped,
             Rectangle canvasViewport)
         {
-            bool closeByKey = WasKeyJustPressed(keys, Keys.Escape) ||
-                              WasKeyJustPressed(keys, Keys.Back) ||
-                              WasKeyJustPressed(keys, Keys.Enter) ||
-                              WasKeyJustPressed(keys, Keys.Space) ||
-                              WasKeyJustPressed(keys, Keys.L);
-
-            if (closeByKey)
-            {
-                if (flow.CloseLeaderboard())
-                {
-                    audio?.Play(GameAudio.SoundToggle);
-                }
-                return;
-            }
-
+            Point? pointerPoint = null;
             if (clicked)
             {
-                Point canvasPoint = ScreenToCanvas(mouse.X, mouse.Y, canvasViewport);
-                if (flow.TryCloseLeaderboardAt(canvasPoint.X, canvasPoint.Y))
-                {
-                    ignorePointerUntilRelease = true;
-                    audio?.Play(GameAudio.SoundToggle);
-                }
+                pointerPoint = ScreenToCanvas(mouse.X, mouse.Y, canvasViewport);
             }
             else if (tapped)
             {
-                Point canvasPoint = ScreenToCanvas(touch[0].Position.X, touch[0].Position.Y, canvasViewport);
-                if (flow.TryCloseLeaderboardAt(canvasPoint.X, canvasPoint.Y))
+                pointerPoint = ScreenToCanvas(touch[0].Position.X, touch[0].Position.Y, canvasViewport);
+            }
+
+            // Clicking the top-right Trophy icon closes the leaderboard modal from any sub-view.
+            if (pointerPoint.HasValue && !isProfileBusy &&
+                LeaderboardIconButton.Contains(pointerPoint.Value.X, pointerPoint.Value.Y))
+            {
+                ignorePointerUntilRelease = true;
+                CloseLeaderboardScreen();
+                return;
+            }
+
+            if (leaderboardSubView == LeaderboardSubView.Rankings)
+            {
+                bool closeByKey = WasKeyJustPressed(keys, Keys.Escape) ||
+                                  WasKeyJustPressed(keys, Keys.Back) ||
+                                  WasKeyJustPressed(keys, Keys.Enter) ||
+                                  WasKeyJustPressed(keys, Keys.Space) ||
+                                  WasKeyJustPressed(keys, Keys.L);
+
+                if (closeByKey)
                 {
-                    ignorePointerUntilRelease = true;
-                    audio?.Play(GameAudio.SoundToggle);
+                    CloseLeaderboardScreen();
+                    return;
                 }
+
+                if (pointerPoint.HasValue)
+                {
+                    Point pt = pointerPoint.Value;
+                    if (LeaderboardNameButton.Contains(pt.X, pt.Y))
+                    {
+                        ignorePointerUntilRelease = true;
+                        audio?.Play(GameAudio.SoundToggle);
+                        BeginNameEditor(fromPostRunPrompt: false);
+                    }
+                    else if (LeaderboardSyncButton.Contains(pt.X, pt.Y))
+                    {
+                        ignorePointerUntilRelease = true;
+                        audio?.Play(GameAudio.SoundToggle);
+                        OpenSyncOverview();
+                    }
+                    else if (flow.BackButton.Contains(pt.X, pt.Y))
+                    {
+                        ignorePointerUntilRelease = true;
+                        CloseLeaderboardScreen();
+                    }
+                }
+            }
+            else if (leaderboardSubView == LeaderboardSubView.SyncOverview)
+            {
+                if (WasKeyJustPressed(keys, Keys.Escape) || WasKeyJustPressed(keys, Keys.Back))
+                {
+                    leaderboardSubView = LeaderboardSubView.Rankings;
+                    audio?.Play(GameAudio.SoundToggle);
+                    return;
+                }
+
+                if (pointerPoint.HasValue)
+                {
+                    Point pt = pointerPoint.Value;
+                    if (SyncCopyButton.Contains(pt.X, pt.Y))
+                    {
+                        ignorePointerUntilRelease = true;
+                        HandleCopyConnectCode();
+                    }
+                    else if (SyncEnterCodeButton.Contains(pt.X, pt.Y))
+                    {
+                        ignorePointerUntilRelease = true;
+                        audio?.Play(GameAudio.SoundToggle);
+                        BeginSyncEnterCode();
+                    }
+                    else if (flow.BackButton.Contains(pt.X, pt.Y))
+                    {
+                        ignorePointerUntilRelease = true;
+                        leaderboardSubView = LeaderboardSubView.Rankings;
+                        audio?.Play(GameAudio.SoundToggle);
+                    }
+                }
+            }
+            else if (leaderboardSubView == LeaderboardSubView.EditName ||
+                     leaderboardSubView == LeaderboardSubView.SyncEnterCode)
+            {
+                UpdateKeypadModalInput(keys, pointerPoint);
             }
         }
 
-        private void OpenLeaderboardScreen()
+        private void HandleCopyConnectCode()
         {
-            if (flow.OpenLeaderboard())
+            string code = leaderboardService?.PlayerConnectCode ?? string.Empty;
+            bool copied = platformBridge.TryCopyTextToClipboard(code);
+            syncStatusMessage = copied ? "CODE COPIED TO CLIPBOARD!" : "WRITE DOWN SAVE CODE ABOVE";
+            audio?.Play(GameAudio.SoundToggle);
+
+            if (!hasBackedUpCustomProfileThisSession &&
+                leaderboardService != null &&
+                leaderboardService.HasCustomPlayerName)
             {
+                EnsureCustomProfileSyncedInBackground();
+            }
+        }
+
+        private void UpdateKeypadModalInput(KeyboardState keys, Point? pointerPoint)
+        {
+            if (isProfileBusy)
+            {
+                return;
+            }
+
+            if (WasKeyJustPressed(keys, Keys.Escape))
+            {
+                CancelKeypadModal();
+                return;
+            }
+
+            if (WasKeyJustPressed(keys, Keys.Enter))
+            {
+                ConfirmKeypadModal();
+                return;
+            }
+
+            bool isNameMode = leaderboardSubView == LeaderboardSubView.EditName;
+            int maxLength = isNameMode
+                ? PlayerIdentityValidator.MaxNameLength
+                : PlayerIdentityValidator.ConnectCodeLength;
+
+            if (WasKeyJustPressed(keys, Keys.Back) || WasKeyJustPressed(keys, Keys.Delete))
+            {
+                BackspaceEditorBuffer();
+            }
+
+            HandlePhysicalKeyboardTextEntry(keys, isNameMode, maxLength);
+
+            if (!pointerPoint.HasValue)
+            {
+                return;
+            }
+
+            Point pt = pointerPoint.Value;
+            if (ModalCancelButton.Contains(pt.X, pt.Y))
+            {
+                ignorePointerUntilRelease = true;
+                CancelKeypadModal();
+                return;
+            }
+
+            if (ModalConfirmButton.Contains(pt.X, pt.Y))
+            {
+                ignorePointerUntilRelease = true;
+                ConfirmKeypadModal();
+                return;
+            }
+
+            for (int i = 0; i < OnScreenKeypad.Length; i++)
+            {
+                KeypadKey key = OnScreenKeypad[i];
+                if (!key.Bounds.Contains(pt.X, pt.Y))
+                {
+                    continue;
+                }
+
+                ignorePointerUntilRelease = true;
+                if (key.IsBackspace)
+                {
+                    BackspaceEditorBuffer();
+                }
+                else if (isNameMode || (key.Character != '_' && key.Character != '-'))
+                {
+                    AppendEditorCharacter(key.Character, maxLength);
+                }
+
+                break;
+            }
+        }
+
+        private void HandlePhysicalKeyboardTextEntry(KeyboardState keys, bool allowPunctuation, int maxLength)
+        {
+            bool shiftHeld = keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift);
+
+            for (int i = 0; i < LetterKeys.Length; i++)
+            {
+                if (WasKeyJustPressed(keys, LetterKeys[i]))
+                {
+                    AppendEditorCharacter((char)('A' + i), maxLength);
+                }
+            }
+
+            if (!shiftHeld)
+            {
+                for (int i = 0; i < TopDigitKeys.Length; i++)
+                {
+                    if (WasKeyJustPressed(keys, TopDigitKeys[i]))
+                    {
+                        AppendEditorCharacter((char)('0' + i), maxLength);
+                    }
+                }
+            }
+
+            for (int i = 0; i < NumPadDigitKeys.Length; i++)
+            {
+                if (WasKeyJustPressed(keys, NumPadDigitKeys[i]))
+                {
+                    AppendEditorCharacter((char)('0' + i), maxLength);
+                }
+            }
+
+            if (!allowPunctuation)
+            {
+                return;
+            }
+
+            if (WasKeyJustPressed(keys, Keys.OemMinus))
+            {
+                AppendEditorCharacter(shiftHeld ? '_' : '-', maxLength);
+            }
+            else if (WasKeyJustPressed(keys, Keys.Subtract))
+            {
+                AppendEditorCharacter('-', maxLength);
+            }
+            else if (WasKeyJustPressed(keys, Keys.Space) &&
+                     editorBuffer.Length > 0 &&
+                     editorBuffer[editorBuffer.Length - 1] != '_')
+            {
+                AppendEditorCharacter('_', maxLength);
+            }
+        }
+
+        private void AppendEditorCharacter(char c, int maxLength)
+        {
+            if (editorBuffer.Length >= maxLength)
+            {
+                return;
+            }
+
+            editorBuffer += char.ToUpperInvariant(c);
+            editorStatusMessage = string.Empty;
+            editorStatusIsError = false;
+            audio?.Play(GameAudio.SoundToggle);
+        }
+
+        private void BackspaceEditorBuffer()
+        {
+            if (editorBuffer.Length == 0)
+            {
+                return;
+            }
+
+            editorBuffer = editorBuffer.Substring(0, editorBuffer.Length - 1);
+            editorStatusMessage = string.Empty;
+            editorStatusIsError = false;
+            audio?.Play(GameAudio.SoundToggle);
+        }
+
+        private void CancelKeypadModal()
+        {
+            audio?.Play(GameAudio.SoundToggle);
+            if (leaderboardSubView == LeaderboardSubView.SyncEnterCode)
+            {
+                leaderboardSubView = LeaderboardSubView.SyncOverview;
+                return;
+            }
+
+            if (openedFromPostRunAutoPrompt)
+            {
+                CloseLeaderboardScreen();
+            }
+            else
+            {
+                leaderboardSubView = LeaderboardSubView.Rankings;
+            }
+        }
+
+        private void ConfirmKeypadModal()
+        {
+            if (leaderboardSubView == LeaderboardSubView.EditName)
+            {
+                if (!PlayerIdentityValidator.TryValidateCustomName(
+                        editorBuffer,
+                        out string validName,
+                        out string validationError))
+                {
+                    editorStatusMessage = validationError;
+                    editorStatusIsError = true;
+                    return;
+                }
+
                 audio?.Play(GameAudio.SoundToggle);
-                RefreshLeaderboardInBackground();
+                SavePlayerNameInBackground(validName);
+            }
+            else if (leaderboardSubView == LeaderboardSubView.SyncEnterCode)
+            {
+                if (!PlayerIdentityValidator.TryNormalizeConnectCode(
+                        editorBuffer,
+                        out string normalizedCode))
+                {
+                    editorStatusMessage = "ENTER 12-CHAR SAVE CODE";
+                    editorStatusIsError = true;
+                    return;
+                }
+
+                audio?.Play(GameAudio.SoundToggle);
+                RestoreProfileInBackground(normalizedCode);
             }
         }
 
@@ -825,7 +1329,7 @@ namespace BillusBucket
                 string completedRunId = string.IsNullOrWhiteSpace(currentRunId)
                     ? Guid.NewGuid().ToString("N")
                     : currentRunId;
-                SubmitCompletedRunScoreInBackground(completedRunId, lastRunCash, elapsed);
+                activeRunSubmissionTask = SubmitCompletedRunScoreAsync(completedRunId, lastRunCash, elapsed);
             }
         }
 
@@ -840,6 +1344,10 @@ namespace BillusBucket
             {
                 await leaderboardService.InitializeAsync();
                 bestKnownCash = BigInteger.Max(bestKnownCash, leaderboardService.GetPersonalBest());
+                if (leaderboardService.HasCustomPlayerName)
+                {
+                    hasAutoPromptedForName = true;
+                }
             }
             catch (Exception error)
             {
@@ -858,6 +1366,10 @@ namespace BillusBucket
             {
                 LeaderboardSnapshot snapshot = await leaderboardService.RefreshRankingsAsync();
                 bestKnownCash = BigInteger.Max(bestKnownCash, snapshot.PersonalBest);
+                if (leaderboardService.HasCustomPlayerName)
+                {
+                    hasAutoPromptedForName = true;
+                }
             }
             catch (Exception error)
             {
@@ -865,7 +1377,7 @@ namespace BillusBucket
             }
         }
 
-        private async void SubmitCompletedRunScoreInBackground(
+        private async Task SubmitCompletedRunScoreAsync(
             string runId,
             BigInteger finalScore,
             float runDurationSeconds)
@@ -882,10 +1394,134 @@ namespace BillusBucket
                     finalScore,
                     runDurationSeconds);
                 bestKnownCash = BigInteger.Max(bestKnownCash, result.PersonalBest);
+                if (result.SubmittedOnline && leaderboardService.HasCustomPlayerName)
+                {
+                    hasBackedUpCustomProfileThisSession = true;
+                }
             }
             catch (Exception error)
             {
                 Debug.WriteLine("Leaderboard submit skipped: " + error.Message);
+            }
+        }
+
+        private async void SavePlayerNameInBackground(string validName)
+        {
+            if (leaderboardService == null)
+            {
+                return;
+            }
+
+            isProfileBusy = true;
+            editorStatusMessage = "SAVING NAME...";
+            editorStatusIsError = false;
+
+            try
+            {
+                // Ensure any in-flight run score submission completes first so the weekly row renames cleanly.
+                if (activeRunSubmissionTask != null)
+                {
+                    await activeRunSubmissionTask;
+                }
+
+                ProfileSyncResult result = await leaderboardService.UpdatePlayerNameAsync(validName);
+                isProfileBusy = false;
+
+                if (!result.Accepted)
+                {
+                    editorStatusMessage = string.IsNullOrWhiteSpace(result.Message)
+                        ? "NAME NOT ALLOWED"
+                        : result.Message;
+                    editorStatusIsError = true;
+                    return;
+                }
+
+                hasAutoPromptedForName = true;
+                if (result.SyncedOnline)
+                {
+                    hasBackedUpCustomProfileThisSession = true;
+                }
+
+                bestKnownCash = BigInteger.Max(bestKnownCash, result.PersonalBest);
+                openedFromPostRunAutoPrompt = false;
+                leaderboardSubView = LeaderboardSubView.Rankings;
+                rankingsToastMessage = string.IsNullOrWhiteSpace(result.Message)
+                    ? "SAVED AS " + result.DisplayName
+                    : result.Message;
+                rankingsToastTimer = ToastDurationSeconds;
+            }
+            catch (Exception error)
+            {
+                isProfileBusy = false;
+                editorStatusMessage = "SAVED ON DEVICE";
+                editorStatusIsError = false;
+                leaderboardSubView = LeaderboardSubView.Rankings;
+                Debug.WriteLine("Profile save skipped: " + error.Message);
+            }
+        }
+
+        private async void EnsureCustomProfileSyncedInBackground()
+        {
+            if (leaderboardService == null || !leaderboardService.HasCustomPlayerName)
+            {
+                return;
+            }
+
+            try
+            {
+                ProfileSyncResult result = await leaderboardService.UpdatePlayerNameAsync(
+                    leaderboardService.PlayerDisplayName);
+                if (result.SyncedOnline)
+                {
+                    hasBackedUpCustomProfileThisSession = true;
+                    bestKnownCash = BigInteger.Max(bestKnownCash, result.PersonalBest);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private async void RestoreProfileInBackground(string normalizedCode)
+        {
+            if (leaderboardService == null)
+            {
+                return;
+            }
+
+            isProfileBusy = true;
+            editorStatusMessage = "CONNECTING PROFILE...";
+            editorStatusIsError = false;
+
+            try
+            {
+                ProfileSyncResult result = await leaderboardService.RestoreProfileByCodeAsync(normalizedCode);
+                isProfileBusy = false;
+
+                if (!result.Accepted)
+                {
+                    editorStatusMessage = string.IsNullOrWhiteSpace(result.Message)
+                        ? "SAVE CODE NOT FOUND"
+                        : result.Message;
+                    editorStatusIsError = true;
+                    return;
+                }
+
+                hasAutoPromptedForName = true;
+                hasBackedUpCustomProfileThisSession = true;
+                bestKnownCash = BigInteger.Max(bestKnownCash, result.PersonalBest);
+                leaderboardSubView = LeaderboardSubView.Rankings;
+                rankingsToastMessage = string.IsNullOrWhiteSpace(result.Message)
+                    ? "CONNECTED AS " + result.DisplayName
+                    : result.Message;
+                rankingsToastTimer = ToastDurationSeconds;
+            }
+            catch (Exception error)
+            {
+                isProfileBusy = false;
+                editorStatusMessage = "OFFLINE - CHECK INTERNET";
+                editorStatusIsError = true;
+                Debug.WriteLine("Profile restore skipped: " + error.Message);
             }
         }
 
@@ -1271,22 +1907,59 @@ namespace BillusBucket
             Rectangle panel = new Rectangle(50, 8, 220, 146);
             DrawTimberPanel(panel);
 
+            if (leaderboardSubView == LeaderboardSubView.EditName)
+            {
+                DrawNameEditorModal();
+                return;
+            }
+
+            if (leaderboardSubView == LeaderboardSubView.SyncOverview)
+            {
+                DrawSyncOverviewModal();
+                return;
+            }
+
+            if (leaderboardSubView == LeaderboardSubView.SyncEnterCode)
+            {
+                DrawSyncEnterCodeModal();
+                return;
+            }
+
+            DrawLeaderboardRankingsView(panel);
+        }
+
+        private void DrawLeaderboardRankingsView(Rectangle panel)
+        {
             LeaderboardSnapshot snapshot = leaderboardService?.CurrentSnapshot
                 ?? new LeaderboardSnapshot(GetCurrentBestScore(), statusMessage: "PERSONAL BEST SAVED ON DEVICE");
             LeaderboardCapabilities capabilities = leaderboardService?.Capabilities;
 
             BigInteger bestScore = BigInteger.Max(GetCurrentBestScore(), snapshot.PersonalBest);
+            string playerName = leaderboardService?.PlayerDisplayName ?? "PLAYER";
 
-            DrawCenteredText("WEEKLY TOP 10", y: 16f, WarmTitleColor, scale: 1);
+            DrawCenteredText("WEEKLY TOP 10", y: 15f, WarmTitleColor, scale: 1);
 
-            string personalLine = "YOUR BEST: " + FitCompactRupeeAmount(bestScore, 80);
+            DrawText("YOU: " + playerName, new Vector2(60f, 24f), BestValueColor, scale: 1);
             if (snapshot.CurrentPlayerWeeklyRank.HasValue)
             {
-                personalLine += "  RANK #" + snapshot.CurrentPlayerWeeklyRank.Value;
+                DrawRightAlignedText(
+                    "RANK #" + snapshot.CurrentPlayerWeeklyRank.Value,
+                    rightX: 260,
+                    y: 24,
+                    ScoreValueColor,
+                    scale: 1);
             }
-            DrawCenteredText(personalLine, y: 26f, BestValueColor, scale: 1);
+            else
+            {
+                DrawRightAlignedText(
+                    "BEST " + FitCompactRupeeAmount(bestScore, 64),
+                    rightX: 260,
+                    y: 24,
+                    BestValueColor,
+                    scale: 1);
+            }
 
-            DrawRect(panel.X + 10, 35, panel.Width - 20, 1, PanelTimberColor);
+            DrawRect(panel.X + 10, 33, panel.Width - 20, 1, PanelTimberColor);
 
             if (snapshot.IsLoading && snapshot.WeeklyTop10.Count == 0)
             {
@@ -1298,11 +1971,7 @@ namespace BillusBucket
                 for (int i = 0; i < rowCount; i++)
                 {
                     LeaderboardRankEntry entry = snapshot.WeeklyTop10[i];
-                    int rowY = 39 + i * 10;
-                    if (rowCount > 9)
-                    {
-                        rowY = 39 + i * 9;
-                    }
+                    int rowY = rowCount > 9 ? (37 + i * 9) : (37 + i * 10);
 
                     Color rowColor = entry.IsCurrentPlayer
                         ? BestValueColor
@@ -1345,7 +2014,201 @@ namespace BillusBucket
                 DrawCenteredText(secondaryStatus, y: 86f, HudLabelColor, scale: 1);
             }
 
+            if (rankingsToastTimer > 0f && !string.IsNullOrWhiteSpace(rankingsToastMessage))
+            {
+                DrawCenteredText(rankingsToastMessage, y: 136f, ScoreValueColor, scale: 1);
+            }
+
+            DrawButton("NAME", LeaderboardNameButton, isLeaderboardNameHovered);
             DrawButton("BACK", flow.BackButton, isBackButtonHovered);
+            DrawButton("SYNC", LeaderboardSyncButton, isLeaderboardSyncHovered);
+        }
+
+        private void DrawNameEditorModal()
+        {
+            bool hasCustom = leaderboardService != null && leaderboardService.HasCustomPlayerName;
+            string heading = hasCustom ? "CHANGE YOUR NAME" : "CHOOSE YOUR NAME";
+            DrawCenteredText(heading, y: 15f, WarmTitleColor, scale: 1);
+
+            DrawInputBox(
+                new Rectangle(76, 25, 168, 16),
+                editorBuffer,
+                showCursor: !isProfileBusy && editorBuffer.Length < PlayerIdentityValidator.MaxNameLength);
+
+            string statusLine = string.IsNullOrWhiteSpace(editorStatusMessage)
+                ? "2-12 LETTERS OR NUMBERS"
+                : editorStatusMessage;
+            Color statusColor = string.IsNullOrWhiteSpace(editorStatusMessage)
+                ? HudLabelColor
+                : (editorStatusIsError ? GameOverTitleColor : ScoreValueColor);
+            DrawCenteredText(statusLine, y: 44f, statusColor, scale: 1);
+
+            DrawOnScreenKeypad(allowPunctuation: true);
+            DrawCenteredText("SAVED ON DEVICE + CLOUD", y: 128f, HudLabelColor, scale: 1);
+
+            string cancelLabel = (openedFromPostRunAutoPrompt && !hasCustom) ? "LATER" : "CANCEL";
+            DrawButton(cancelLabel, ModalCancelButton, isModalCancelHovered);
+            DrawButton(isProfileBusy ? "WAIT" : "SAVE", ModalConfirmButton, isModalConfirmHovered);
+        }
+
+        private void DrawSyncOverviewModal()
+        {
+            string playerName = leaderboardService?.PlayerDisplayName ?? "PLAYER";
+            string connectCode = leaderboardService?.PlayerConnectCode ?? "----";
+            bool hasCustomName = leaderboardService != null && leaderboardService.HasCustomPlayerName;
+
+            DrawCenteredText("CLOUD SAVE + SYNC", y: 15f, WarmTitleColor, scale: 1);
+            DrawCenteredText("PLAYER: " + playerName, y: 28f, BestValueColor, scale: 1);
+            DrawCenteredText("YOUR 12-CHAR SAVE CODE:", y: 40f, HudLabelColor, scale: 1);
+
+            Rectangle codeBox = new Rectangle(72, 50, 176, 20);
+            DrawRect(codeBox.X, codeBox.Y, codeBox.Width, codeBox.Height, PanelInkColor);
+            DrawRect(codeBox.X + 1, codeBox.Y + 1, codeBox.Width - 2, codeBox.Height - 2, InputBoxFillColor);
+            DrawRect(codeBox.X + 1, codeBox.Y + 1, codeBox.Width - 2, 1, PanelTimberColor);
+            DrawRect(codeBox.X + 1, codeBox.Bottom - 2, codeBox.Width - 2, 1, PanelTopTrimColor);
+            DrawCenteredText(connectCode, y: 57f, ScoreValueColor, scale: 1);
+
+            if (!string.IsNullOrWhiteSpace(syncStatusMessage))
+            {
+                DrawCenteredText(syncStatusMessage, y: 76f, WarmTitleColor, scale: 1);
+            }
+            else if (!hasCustomName)
+            {
+                DrawCenteredText("SET YOUR NAME FIRST TO SAVE", y: 76f, GameOverTitleColor, scale: 1);
+            }
+            else
+            {
+                DrawCenteredText("USE CODE ON PHONE, PC OR WEB", y: 76f, HudLabelColor, scale: 1);
+            }
+
+            DrawCenteredText("RESTORES NAME, BEST + RANK", y: 88f, HudLabelColor, scale: 1);
+
+            DrawButton("COPY CODE", SyncCopyButton, isSyncCopyHovered);
+            DrawButton("ENTER CODE", SyncEnterCodeButton, isSyncEnterCodeHovered);
+            DrawButton("BACK", flow.BackButton, isBackButtonHovered);
+        }
+
+        private void DrawSyncEnterCodeModal()
+        {
+            DrawCenteredText("ENTER SAVE CODE", y: 15f, WarmTitleColor, scale: 1);
+
+            string formattedCode = PlayerIdentityValidator.FormatPartialConnectCode(editorBuffer);
+            DrawInputBox(
+                new Rectangle(72, 25, 176, 16),
+                formattedCode,
+                showCursor: !isProfileBusy && editorBuffer.Length < PlayerIdentityValidator.ConnectCodeLength);
+
+            string statusLine = string.IsNullOrWhiteSpace(editorStatusMessage)
+                ? "TYPE 12 LETTERS OR NUMBERS"
+                : editorStatusMessage;
+            Color statusColor = string.IsNullOrWhiteSpace(editorStatusMessage)
+                ? HudLabelColor
+                : (editorStatusIsError ? GameOverTitleColor : ScoreValueColor);
+            DrawCenteredText(statusLine, y: 44f, statusColor, scale: 1);
+
+            DrawOnScreenKeypad(allowPunctuation: false);
+            DrawCenteredText("LINKS YOUR CLOUD NAME + BEST", y: 128f, HudLabelColor, scale: 1);
+
+            DrawButton("CANCEL", ModalCancelButton, isModalCancelHovered);
+            DrawButton(isProfileBusy ? "WAIT" : "CONNECT", ModalConfirmButton, isModalConfirmHovered);
+        }
+
+        private void DrawInputBox(Rectangle box, string valueText, bool showCursor)
+        {
+            DrawRect(box.X, box.Y, box.Width, box.Height, PanelInkColor);
+            DrawRect(box.X + 1, box.Y + 1, box.Width - 2, box.Height - 2, InputBoxFillColor);
+            DrawRect(box.X + 1, box.Bottom - 2, box.Width - 2, 1, PanelTimberColor);
+
+            string safeValue = valueText ?? string.Empty;
+            bool blinkOn = ((int)(ambientTime * 3f) % 2) == 0;
+            int valueWidth = PixelFont.Width(safeValue, scale: 1);
+            int cursorWidth = showCursor ? (PixelFont.Width("_", scale: 1) + (safeValue.Length > 0 ? 1 : 0)) : 0;
+            int totalWidth = valueWidth + cursorWidth;
+
+            int textX = box.X + (box.Width - totalWidth) / 2;
+            int textY = box.Y + 5;
+
+            if (safeValue.Length > 0)
+            {
+                DrawText(safeValue, new Vector2(textX, textY), ButtonTextColor, scale: 1);
+            }
+
+            if (showCursor && blinkOn)
+            {
+                int cursorX = safeValue.Length > 0 ? (textX + valueWidth + 1) : textX;
+                DrawText("_", new Vector2(cursorX, textY), WarmTitleColor, scale: 1);
+            }
+        }
+
+        private void DrawOnScreenKeypad(bool allowPunctuation)
+        {
+            for (int i = 0; i < OnScreenKeypad.Length; i++)
+            {
+                KeypadKey key = OnScreenKeypad[i];
+                bool enabled = !isProfileBusy &&
+                               (allowPunctuation || key.IsBackspace || (key.Character != '_' && key.Character != '-'));
+                bool hovered = enabled && hoveredKeypadIndex == i;
+
+                ButtonBounds b = key.Bounds;
+                DrawRect(b.X, b.Y, b.Width, b.Height, PanelInkColor);
+
+                Color fill = !enabled
+                    ? KeyDisabledFillColor
+                    : hovered
+                        ? KeyHoverFillColor
+                        : (key.IsBackspace ? KeyDeleteFillColor : KeyFillColor);
+                DrawRect(b.X + 1, b.Y + 1, b.Width - 2, b.Height - 2, fill);
+
+                if (enabled)
+                {
+                    Color topGlint = hovered
+                        ? KeyHoverHighlightColor
+                        : (key.IsBackspace ? PanelTopTrimColor : KeyHighlightColor);
+                    DrawRect(b.X + 2, b.Y + 1, b.Width - 4, 1, topGlint);
+                }
+
+                Color labelColor = enabled ? ButtonTextColor : (HudLabelColor * 0.55f);
+                int labelWidth = PixelFont.Width(key.Label, scale: 1);
+                int labelX = b.X + (b.Width - labelWidth) / 2;
+                int labelY = b.Y + 4;
+                DrawText(key.Label, new Vector2(labelX, labelY), labelColor, scale: 1);
+            }
+        }
+
+        private static KeypadKey[] BuildOnScreenKeypad()
+        {
+            const int startX = 61;
+            const int startY = 55;
+            const int keyWidth = 18;
+            const int keyHeight = 15;
+            const int stepX = 20;
+            const int stepY = 17;
+
+            string[] rows =
+            {
+                "1234567890",
+                "QWERTYUIOP",
+                "ASDFGHJKL_",
+                "ZXCVBNM-"
+            };
+
+            List<KeypadKey> keys = new List<KeypadKey>(39);
+            for (int row = 0; row < rows.Length; row++)
+            {
+                string chars = rows[row];
+                int y = startY + row * stepY;
+                for (int col = 0; col < chars.Length; col++)
+                {
+                    char c = chars[col];
+                    ButtonBounds bounds = new ButtonBounds(startX + col * stepX, y, keyWidth, keyHeight);
+                    keys.Add(new KeypadKey(c.ToString(), c, isBackspace: false, bounds));
+                }
+            }
+
+            // Double-wide DEL key in the bottom-right corner (columns 8..9 of row 3)
+            ButtonBounds delBounds = new ButtonBounds(startX + 8 * stepX, startY + 3 * stepY, keyWidth * 2 + 2, keyHeight);
+            keys.Add(new KeypadKey("DEL", '\0', isBackspace: true, delBounds));
+            return keys.ToArray();
         }
 
         private void DrawRightAlignedText(string text, int rightX, int y, Color color, int scale)
@@ -1392,7 +2255,7 @@ namespace BillusBucket
         }
 
         /// <summary>
-        /// Draws ui-button.png with crisp 3-slice horizontal caps so wider labels ("PLAY AGAIN", "LEADERBOARD")
+        /// Draws ui-button.png with crisp 3-slice horizontal caps so wider labels ("COPY CODE", "ENTER CODE")
         /// never distort the pixel-art bevels.
         /// </summary>
         private void DrawButton(string label, ButtonBounds bounds, bool isHovered)

@@ -91,6 +91,42 @@
         }
     }
 
+    function copyTextToClipboard(text) {
+        const value = String(text ?? "").trim();
+        if (!value) {
+            return false;
+        }
+
+        let copied = false;
+        try {
+            if (document.createElement && document.body && typeof document.execCommand === "function") {
+                const area = document.createElement("textarea");
+                area.value = value;
+                area.setAttribute("readonly", "readonly");
+                area.style.position = "fixed";
+                area.style.left = "-9999px";
+                area.style.top = "0";
+                document.body.appendChild(area);
+                area.focus();
+                area.select();
+                copied = Boolean(document.execCommand("copy"));
+                document.body.removeChild(area);
+                document.getElementById("theCanvas")?.focus?.();
+            }
+        } catch (_err) {
+        }
+
+        try {
+            if (window.navigator?.clipboard?.writeText) {
+                window.navigator.clipboard.writeText(value).catch(function () {});
+                copied = true;
+            }
+        } catch (_err) {
+        }
+
+        return copied;
+    }
+
     function getEffectiveConfig() {
         const raw = window.BILLU_PLATFORM_CONFIG || {};
         let platform = String(raw.activePlatform || "local").trim().toLowerCase();
@@ -433,6 +469,7 @@
         submitCrazyGamesScore: submitCrazyGamesScore,
         storageGet: storageGet,
         storageSet: storageSet,
+        copyTextToClipboard: copyTextToClipboard,
         startRenderLoop: startRenderLoop,
         showFatalError: showFatalError,
         isExternalAudioMuted: isExternalAudioMuted,

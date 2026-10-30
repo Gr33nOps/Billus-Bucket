@@ -20,6 +20,10 @@ namespace BillusBucket
 
         public LeaderboardSnapshot CurrentSnapshot => activeDelegate.CurrentSnapshot;
 
+        public string PlayerDisplayName => activeDelegate.PlayerDisplayName;
+        public bool HasCustomPlayerName => activeDelegate.HasCustomPlayerName;
+        public string PlayerConnectCode => activeDelegate.PlayerConnectCode;
+
         public PokiLeaderboardService(
             ILocalScoreStorage storage,
             bool isApprovedByPokiCsp,
@@ -64,6 +68,16 @@ namespace BillusBucket
             float runDurationSeconds = 0f)
         {
             return activeDelegate.SubmitRunScoreAsync(runId, finalScore, runDurationSeconds);
+        }
+
+        public Task<ProfileSyncResult> UpdatePlayerNameAsync(string newDisplayName)
+        {
+            return activeDelegate.UpdatePlayerNameAsync(newDisplayName);
+        }
+
+        public Task<ProfileSyncResult> RestoreProfileByCodeAsync(string connectCode)
+        {
+            return activeDelegate.RestoreProfileByCodeAsync(connectCode);
         }
 
         public Task<LeaderboardSnapshot> RefreshRankingsAsync()

@@ -4,13 +4,17 @@ using System.Threading.Tasks;
 namespace BillusBucket
 {
     /// <summary>
-    /// Platform-independent leaderboard contract used by BillusBucketGame.
+    /// Platform-independent leaderboard and cloud player profile contract used by BillusBucketGame.
     /// Implementations exist for Local/Default, CrazyGames, Poki, and Shared Online backends.
     /// </summary>
     public interface ILeaderboardService
     {
         LeaderboardCapabilities Capabilities { get; }
         LeaderboardSnapshot CurrentSnapshot { get; }
+
+        string PlayerDisplayName { get; }
+        bool HasCustomPlayerName { get; }
+        string PlayerConnectCode { get; }
 
         Task InitializeAsync();
 
@@ -30,6 +34,16 @@ namespace BillusBucket
             string runId,
             BigInteger finalScore,
             float runDurationSeconds = 0f);
+
+        /// <summary>
+        /// Validates and saves the player's custom display name locally and syncs it to the cloud profile if online.
+        /// </summary>
+        Task<ProfileSyncResult> UpdatePlayerNameAsync(string newDisplayName);
+
+        /// <summary>
+        /// Restores a player's saved custom name, personal best, and leaderboard identity across devices using their 12-char Save Code.
+        /// </summary>
+        Task<ProfileSyncResult> RestoreProfileByCodeAsync(string connectCode);
 
         /// <summary>
         /// Refreshes the weekly top-10 rankings and player rank if supported by the active provider.

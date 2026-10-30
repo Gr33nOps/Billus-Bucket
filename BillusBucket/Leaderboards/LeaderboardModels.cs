@@ -115,4 +115,33 @@ namespace BillusBucket
             Message = message ?? string.Empty;
         }
     }
+
+    /// <summary>
+    /// Outcome of saving a custom player name or restoring a cloud profile via Save Code.
+    /// </summary>
+    public sealed class ProfileSyncResult
+    {
+        public bool Accepted { get; }
+        public bool SyncedOnline { get; }
+        public string DisplayName { get; }
+        public BigInteger PersonalBest { get; }
+        public int? WeeklyRank { get; }
+        public string Message { get; }
+
+        public ProfileSyncResult(
+            bool accepted,
+            bool syncedOnline,
+            string displayName,
+            BigInteger personalBest,
+            int? weeklyRank = null,
+            string message = "")
+        {
+            Accepted = accepted;
+            SyncedOnline = syncedOnline;
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? "PLAYER" : displayName;
+            PersonalBest = personalBest < BigInteger.Zero ? BigInteger.Zero : personalBest;
+            WeeklyRank = weeklyRank.HasValue && weeklyRank.Value > 0 ? weeklyRank : null;
+            Message = message ?? string.Empty;
+        }
+    }
 }

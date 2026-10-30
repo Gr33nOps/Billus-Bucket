@@ -27,6 +27,7 @@ namespace GameTests
             TestCrazyGamesAdapterPolicies();
             TestPokiAdapterZeroNetworkByDefault();
             TestSharedOnlineAdapterAndOfflineFallback();
+            TestPlayerNameValidationAndCloudProfileSync();
             TestPlatformLifecycleGuard();
             TestEdgeCaseSafety();
 
@@ -734,6 +735,90 @@ namespace GameTests
             Equal(true, float.IsFinite(narrowBucket.X), "BucketControl ignores non-finite dt and handles narrow bounds");
         }
 
+        private static void TestPlayerNameValidationAndCloudProfileSync()
+        {
+            // 1. Custom Name Validation & Profanity Filter
+            Equal(true, PlayerIdentityValidator.TryValidateCustomName("  green king  ", out string normalized, out _),
+                "spaces normalize cleanly to a single underscore");
+            Equal("GREEN_KING", normalized, "normalized custom name matches arcade format");
+            Equal(true, PlayerIdentityValidator.TryValidateCustomName("ACE-99", out string hyphenName, out _),
+                "hyphens and digits are allowed inside 2-12 char names");
+            Equal("ACE-99", hyphenName, "hyphenated custom name preserved");
+
+            Equal(false, PlayerIdentityValidator.TryValidateCustomName("A", out _, out _),
+                "1-char name is rejected");
+            Equal(false, PlayerIdentityValidator.TryValidateCustomName("ABCDEFGHIJKLM", out _, out _),
+                "13-char name is rejected");
+            Equal(false, PlayerIdentityValidator.TryValidateCustomName("_BILLU", out _, out _),
+                "leading underscore is rejected");
+            Equal(false, PlayerIdentityValidator.TryValidateCustomName("BILLU-", out _, out _),
+                "trailing hyphen is rejected");
+            Equal(false, PlayerIdentityValidator.TryValidateCustomName("F_U_C_K", out _, out _),
+                "profanity bypass with underscores is rejected");
+            Equal(false, PlayerIdentityValidator.TryValidateCustomName("SH1T99", out _, out _),
+                "leet-speak profanity is rejected");
+
+            // 2. Unambiguous 12-char Save/Connect Code (XXXX-XXXX-XXXX)
+            string generatedCode = PlayerIdentityValidator.CreateConnectCode();
+            Equal(14, generatedCode.Length, "formatted Save Code is 14 chars including two hyphens");
+            Equal(false, generatedCode.Contains('0') || generatedCode.Contains('1') ||
+                         generatedCode.Contains('I') || generatedCode.Contains('O'),
+                "generated Save Code avoids ambiguous 0/1/I/O characters");
+            Equal("K7P4-M9", PlayerIdentityValidator.FormatPartialConnectCode("k7p4m9"),
+                "partial Save Code formats live with hyphens");
+            Equal(true, PlayerIdentityValidator.TryNormalizeConnectCode("k7p4 m9x2 w3r8", out string normalizedCode),
+                "12 alphanumeric characters normalize into XXXX-XXXX-XXXX");
+            Equal("K7P4-M9X2-W3R8", normalizedCode, "normalized Save Code matches canonical format");
+
+            // 3. End-to-End Cloud Profile Save + Cross-Device Restore via Save Code
+            CountingTransport cloudTransport = new CountingTransport();
+            InMemoryScoreStorage deviceAStorage = new InMemoryScoreStorage(initialBest: 15760);
+            SharedOnlineLeaderboardService deviceA = new SharedOnlineLeaderboardService(
+                deviceAStorage,
+                cloudTransport,
+                sourcePlatform: "web");
+
+            Equal(false, deviceA.HasCustomPlayerName, "fresh device starts without a custom player name");
+            string deviceACode = deviceA.PlayerConnectCode;
+
+            ProfileSyncResult saveRes = deviceA.UpdatePlayerNameAsync("GreenOps").GetAwaiter().GetResult();
+            Equal(true, saveRes.Accepted, "valid custom name is accepted");
+            Equal(true, saveRes.SyncedOnline, "custom name syncs to cloud backend");
+            Equal("GREENOPS", deviceA.PlayerDisplayName, "player display name updates immediately");
+            Equal(true, deviceA.HasCustomPlayerName, "HasCustomPlayerName becomes true after saving");
+            Equal(1, cloudTransport.SaveProfileCount, "SaveProfileAsync called once");
+
+            // Device B (e.g. mobile phone / future Play Store or App Store app) restores using Device A's Save Code
+            InMemoryScoreStorage deviceBStorage = new InMemoryScoreStorage(initialBest: 0);
+            SharedOnlineLeaderboardService deviceB = new SharedOnlineLeaderboardService(
+                deviceBStorage,
+                cloudTransport,
+                sourcePlatform: "android");
+
+            ProfileSyncResult restoreRes = deviceB.RestoreProfileByCodeAsync(deviceACode).GetAwaiter().GetResult();
+            Equal(true, restoreRes.Accepted, "valid Save Code restores cloud profile on second device");
+            Equal("GREENOPS", deviceB.PlayerDisplayName, "second device adopts saved custom player name");
+            Equal(true, deviceB.HasCustomPlayerName, "second device recognizes restored custom name");
+            Equal("15760", deviceB.GetPersonalBest().ToString(), "second device restores cloud personal best");
+            Equal(deviceACode, deviceB.PlayerConnectCode, "second device links to canonical Save Code");
+
+            // 4. Restricted storage resilience & Poki zero-network compliance for custom names
+            LocalLeaderboardService restrictedLocal = new LocalLeaderboardService(new ThrowingScoreStorage());
+            ProfileSyncResult restrictedNameRes = restrictedLocal.UpdatePlayerNameAsync("BILLU_PRO").GetAwaiter().GetResult();
+            Equal(true, restrictedNameRes.Accepted, "restricted storage still accepts custom name in session memory");
+            Equal("BILLU_PRO", restrictedLocal.PlayerDisplayName, "session custom name survives storage exceptions");
+
+            CountingTransport pokiSpy = new CountingTransport();
+            PokiLeaderboardService unapprovedPoki = new PokiLeaderboardService(
+                new InMemoryScoreStorage(),
+                isApprovedByPokiCsp: false,
+                approvedExternalTransport: pokiSpy);
+            ProfileSyncResult pokiNameRes = unapprovedPoki.UpdatePlayerNameAsync("POKI_ACE").GetAwaiter().GetResult();
+            Equal(true, pokiNameRes.Accepted, "Poki saves custom name locally");
+            Equal("POKI_ACE", unapprovedPoki.PlayerDisplayName, "Poki updates local display name");
+            Equal(0, pokiSpy.SaveProfileCount, "unapproved Poki build makes zero network calls when saving name");
+        }
+
         // =====================================================================
         // Test Doubles
         // =====================================================================
@@ -741,11 +826,16 @@ namespace GameTests
         private sealed class ThrowingScoreStorage : ILocalScoreStorage
         {
             public bool IsPersistentStorageAvailable => throw new UnauthorizedAccessException("Storage blocked");
+            public bool HasCustomDisplayName => throw new UnauthorizedAccessException("Storage blocked");
             public BigInteger LoadPersonalBest() => throw new UnauthorizedAccessException("Storage blocked");
             public void SavePersonalBest(BigInteger bestScore, bool flushImmediately = true) =>
                 throw new UnauthorizedAccessException("Storage blocked");
             public string GetOrCreateAnonymousPlayerId() => throw new UnauthorizedAccessException("Storage blocked");
+            public string GetOrCreateConnectCode() => throw new UnauthorizedAccessException("Storage blocked");
             public string GetOrCreateSafeDisplayName() => throw new UnauthorizedAccessException("Storage blocked");
+            public void SaveCustomDisplayName(string customName) => throw new UnauthorizedAccessException("Storage blocked");
+            public void ApplyRestoredProfile(string formattedConnectCode, string customDisplayName, BigInteger restoredPersonalBest) =>
+                throw new UnauthorizedAccessException("Storage blocked");
             public void Flush() => throw new UnauthorizedAccessException("Storage blocked");
         }
 
@@ -772,9 +862,14 @@ namespace GameTests
 
         private sealed class CountingTransport : ISharedLeaderboardTransport
         {
+            private readonly Dictionary<string, (string Name, BigInteger Best)> cloudProfiles =
+                new Dictionary<string, (string Name, BigInteger Best)>(StringComparer.Ordinal);
+
             public bool SimulateOffline { get; set; }
             public int FetchCount { get; private set; }
             public int SubmitCount { get; private set; }
+            public int SaveProfileCount { get; private set; }
+            public int RestoreProfileCount { get; private set; }
 
             public Task<SharedLeaderboardRemoteResponse> FetchWeeklyTop10Async(
                 string anonymousPlayerId,
@@ -806,6 +901,16 @@ namespace GameTests
                         errorMessage: "OFFLINE - SCORE SAVED LOCALLY"));
                 }
 
+                if (PlayerIdentityValidator.TryNormalizeConnectCode(payload.ConnectCode, out string code))
+                {
+                    BigInteger best = payload.Score;
+                    if (cloudProfiles.TryGetValue(code, out var existing) && existing.Best > best)
+                    {
+                        best = existing.Best;
+                    }
+                    cloudProfiles[code] = (payload.DisplayName, best);
+                }
+
                 IReadOnlyList<LeaderboardRankEntry> sample = new[]
                 {
                     new LeaderboardRankEntry(1, "BILLU_1001", 9500),
@@ -813,6 +918,70 @@ namespace GameTests
                     new LeaderboardRankEntry(4, payload.DisplayName, payload.Score, isCurrentPlayer: true)
                 };
                 return Task.FromResult(new SharedLeaderboardRemoteResponse(true, playerWeeklyRank: 4, top10: sample));
+            }
+
+            public Task<SharedLeaderboardRemoteResponse> SaveProfileAsync(SharedProfileSavePayload payload)
+            {
+                SaveProfileCount++;
+                if (SimulateOffline)
+                {
+                    return Task.FromResult(new SharedLeaderboardRemoteResponse(
+                        false,
+                        errorMessage: "OFFLINE - SAVED ON DEVICE"));
+                }
+
+                if (PlayerIdentityValidator.TryNormalizeConnectCode(payload.ConnectCode, out string code))
+                {
+                    BigInteger best = payload.PersonalBest;
+                    if (cloudProfiles.TryGetValue(code, out var existing) && existing.Best > best)
+                    {
+                        best = existing.Best;
+                    }
+                    cloudProfiles[code] = (payload.DisplayName, best);
+                }
+
+                IReadOnlyList<LeaderboardRankEntry> sample = new[]
+                {
+                    new LeaderboardRankEntry(1, payload.DisplayName, BigInteger.Max(payload.PersonalBest, 9500), isCurrentPlayer: true),
+                    new LeaderboardRankEntry(2, "BILLU_2044", 7200)
+                };
+                return Task.FromResult(new SharedLeaderboardRemoteResponse(
+                    true,
+                    playerWeeklyRank: 1,
+                    top10: sample,
+                    profileDisplayName: payload.DisplayName,
+                    profilePersonalBest: payload.PersonalBest));
+            }
+
+            public Task<SharedLeaderboardRemoteResponse> RestoreProfileAsync(string connectCode, string sourcePlatform)
+            {
+                RestoreProfileCount++;
+                if (SimulateOffline)
+                {
+                    return Task.FromResult(new SharedLeaderboardRemoteResponse(
+                        false,
+                        errorMessage: "OFFLINE - CHECK INTERNET"));
+                }
+
+                if (!PlayerIdentityValidator.TryNormalizeConnectCode(connectCode, out string code) ||
+                    !cloudProfiles.TryGetValue(code, out var profile))
+                {
+                    return Task.FromResult(new SharedLeaderboardRemoteResponse(
+                        false,
+                        errorMessage: "SAVE CODE NOT FOUND"));
+                }
+
+                IReadOnlyList<LeaderboardRankEntry> sample = new[]
+                {
+                    new LeaderboardRankEntry(1, profile.Name, BigInteger.Max(profile.Best, 9500), isCurrentPlayer: true),
+                    new LeaderboardRankEntry(2, "BILLU_2044", 7200)
+                };
+                return Task.FromResult(new SharedLeaderboardRemoteResponse(
+                    true,
+                    playerWeeklyRank: 1,
+                    top10: sample,
+                    profileDisplayName: profile.Name,
+                    profilePersonalBest: profile.Best));
             }
         }
 

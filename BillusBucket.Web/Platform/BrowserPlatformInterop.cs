@@ -118,6 +118,29 @@ namespace BillusBucket.Web
             InvokeFireAndForget("billuPlatform.notifyGameplayStop");
         }
 
+        public bool TryCopyTextToClipboard(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            try
+            {
+                if (jsInProcess != null)
+                {
+                    return jsInProcess.Invoke<bool>("billuPlatform.copyTextToClipboard", text);
+                }
+
+                _ = jsRuntime.InvokeVoidAsync("billuPlatform.copyTextToClipboard", text);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private void InvokeFireAndForget(string identifier)
         {
             try
@@ -148,16 +171,30 @@ namespace BillusBucket.Web
         // Retain the former storage key only to migrate existing players' personal best.
         private const string LegacyBestScoreKey = "billu_ki_balti.personal_best";
         private const string PlayerIdKey = "billus_bucket.player_id";
+        private const string ConnectCodeKey = "billus_bucket.connect_code";
+        private const string CustomNameKey = "billus_bucket.custom_name";
         private const string DisplayNameKey = "billus_bucket.display_name";
 
         private readonly IJSInProcessRuntime jsInProcess;
         private BigInteger cachedPersonalBest;
         private bool hasPendingFlush;
         private string cachedPlayerId;
+        private string cachedConnectCode;
         private string cachedDisplayName;
+        private bool customNameChecked;
+        private bool hasCustomDisplayName;
         private bool persistentAvailable;
 
         public bool IsPersistentStorageAvailable => persistentAvailable;
+
+        public bool HasCustomDisplayName
+        {
+            get
+            {
+                EnsureCustomNameLoaded();
+                return hasCustomDisplayName;
+            }
+        }
 
         public BrowserLocalScoreStorage(IJSRuntime jsRuntime, bool initialPersistentAvailable)
         {
@@ -201,19 +238,50 @@ namespace BillusBucket.Web
             }
 
             string existing = TryStorageGet(PlayerIdKey);
-            if (!string.IsNullOrWhiteSpace(existing) && existing.Length >= 16)
+            if (!string.IsNullOrWhiteSpace(existing) && existing.Replace("-", string.Empty).Length >= 12)
             {
                 cachedPlayerId = existing;
                 return cachedPlayerId;
             }
 
-            cachedPlayerId = Guid.NewGuid().ToString("N");
+            cachedPlayerId = PlayerIdentityValidator.CreateConnectCode();
+            cachedConnectCode = cachedPlayerId;
             TryStorageSet(PlayerIdKey, cachedPlayerId);
+            TryStorageSet(ConnectCodeKey, cachedConnectCode);
             return cachedPlayerId;
+        }
+
+        public string GetOrCreateConnectCode()
+        {
+            if (!string.IsNullOrWhiteSpace(cachedConnectCode))
+            {
+                return cachedConnectCode;
+            }
+
+            string existingCode = TryStorageGet(ConnectCodeKey);
+            if (PlayerIdentityValidator.TryNormalizeConnectCode(existingCode, out string normalizedExisting))
+            {
+                cachedConnectCode = normalizedExisting;
+                return cachedConnectCode;
+            }
+
+            string playerId = GetOrCreateAnonymousPlayerId();
+            if (PlayerIdentityValidator.TryNormalizeConnectCode(playerId, out string normalizedFromPlayerId))
+            {
+                cachedConnectCode = normalizedFromPlayerId;
+            }
+            else
+            {
+                cachedConnectCode = PlayerIdentityValidator.CreateConnectCode();
+            }
+
+            TryStorageSet(ConnectCodeKey, cachedConnectCode);
+            return cachedConnectCode;
         }
 
         public string GetOrCreateSafeDisplayName()
         {
+            EnsureCustomNameLoaded();
             if (!string.IsNullOrWhiteSpace(cachedDisplayName))
             {
                 return cachedDisplayName;
@@ -231,6 +299,48 @@ namespace BillusBucket.Web
             return cachedDisplayName;
         }
 
+        public void SaveCustomDisplayName(string customName)
+        {
+            if (!PlayerIdentityValidator.TryValidateCustomName(customName, out string validName, out _))
+            {
+                return;
+            }
+
+            customNameChecked = true;
+            hasCustomDisplayName = true;
+            cachedDisplayName = validName;
+            TryStorageSet(CustomNameKey, validName);
+            TryStorageSet(DisplayNameKey, validName);
+        }
+
+        public void ApplyRestoredProfile(string formattedConnectCode, string customDisplayName, BigInteger restoredPersonalBest)
+        {
+            if (PlayerIdentityValidator.TryNormalizeConnectCode(formattedConnectCode, out string normalizedCode))
+            {
+                cachedPlayerId = normalizedCode;
+                cachedConnectCode = normalizedCode;
+                TryStorageSet(PlayerIdKey, normalizedCode);
+                TryStorageSet(ConnectCodeKey, normalizedCode);
+            }
+
+            if (PlayerIdentityValidator.TryValidateCustomName(customDisplayName, out string validName, out _))
+            {
+                customNameChecked = true;
+                cachedDisplayName = validName;
+                hasCustomDisplayName = !AnonymousPlayerIdentity.IsAutoGeneratedName(validName);
+                if (hasCustomDisplayName)
+                {
+                    TryStorageSet(CustomNameKey, validName);
+                }
+                TryStorageSet(DisplayNameKey, validName);
+            }
+
+            if (restoredPersonalBest > cachedPersonalBest)
+            {
+                SavePersonalBest(restoredPersonalBest, flushImmediately: true);
+            }
+        }
+
         public void Flush()
         {
             if (!hasPendingFlush || cachedPersonalBest <= BigInteger.Zero)
@@ -241,6 +351,22 @@ namespace BillusBucket.Web
             if (TryStorageSet(BestScoreKey, cachedPersonalBest.ToString(CultureInfo.InvariantCulture)))
             {
                 hasPendingFlush = false;
+            }
+        }
+
+        private void EnsureCustomNameLoaded()
+        {
+            if (customNameChecked)
+            {
+                return;
+            }
+
+            customNameChecked = true;
+            string savedCustom = TryStorageGet(CustomNameKey);
+            if (PlayerIdentityValidator.TryValidateCustomName(savedCustom, out string validCustom, out _))
+            {
+                cachedDisplayName = validCustom;
+                hasCustomDisplayName = true;
             }
         }
 

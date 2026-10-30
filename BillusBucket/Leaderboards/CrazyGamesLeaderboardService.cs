@@ -15,11 +15,6 @@ namespace BillusBucket
         bool IsSdkInitialized { get; }
         bool IsNativeLeaderboardReady { get; }
 
-        /// <summary>
-        /// Encrypts the score with AES-GCM (12-byte random IV) and submits via
-        /// window.CrazyGames.SDK.user.submitScore({ encryptedScore, score }).
-        /// Returns true if accepted by the SDK without error.
-        /// </summary>
         Task<bool> SubmitEncryptedScoreAsync(long score);
     }
 
@@ -35,16 +30,10 @@ namespace BillusBucket
     }
 
     /// <summary>
-    /// CrazyGames leaderboard adapter following official CrazyGames SDK v3 documentation:
-    /// https://docs.crazygames.com/sdk/leaderboards/
-    /// - Activates native submission ONLY when leaderboard access is granted and configured.
-    /// - Respects the one-leaderboard-per-game and once-per-run rules.
-    /// - Falls back honestly to local personal-best tracking when not invited or offline.
-    /// - Optionally pairs with an approved shared weekly Top-10 backend if configured.
+    /// CrazyGames leaderboard adapter following official CrazyGames SDK v3 documentation.
     /// </summary>
     public sealed class CrazyGamesLeaderboardService : ILeaderboardService
     {
-        // JavaScript Number.MAX_SAFE_INTEGER (2^53 - 1) for SDK.user.submitScore.
         private const long MaxJavaScriptSafeInteger = 9_007_199_254_740_991L;
         private const int MaxRememberedRuns = 256;
 
@@ -63,6 +52,15 @@ namespace BillusBucket
         public LeaderboardCapabilities Capabilities => BuildCapabilities();
 
         public LeaderboardSnapshot CurrentSnapshot { get; private set; }
+
+        public string PlayerDisplayName =>
+            optionalSharedBoard != null ? optionalSharedBoard.PlayerDisplayName : localFallback.PlayerDisplayName;
+
+        public bool HasCustomPlayerName =>
+            optionalSharedBoard != null ? optionalSharedBoard.HasCustomPlayerName : localFallback.HasCustomPlayerName;
+
+        public string PlayerConnectCode =>
+            optionalSharedBoard != null ? optionalSharedBoard.PlayerConnectCode : localFallback.PlayerConnectCode;
 
         public CrazyGamesLeaderboardService(
             ILocalScoreStorage storage,
@@ -183,6 +181,24 @@ namespace BillusBucket
                 message: CurrentSnapshot.StatusMessage);
         }
 
+        public async Task<ProfileSyncResult> UpdatePlayerNameAsync(string newDisplayName)
+        {
+            ProfileSyncResult result = optionalSharedBoard != null
+                ? await optionalSharedBoard.UpdatePlayerNameAsync(newDisplayName)
+                : await localFallback.UpdatePlayerNameAsync(newDisplayName);
+            CurrentSnapshot = BuildCurrentSnapshot();
+            return result;
+        }
+
+        public async Task<ProfileSyncResult> RestoreProfileByCodeAsync(string connectCode)
+        {
+            ProfileSyncResult result = optionalSharedBoard != null
+                ? await optionalSharedBoard.RestoreProfileByCodeAsync(connectCode)
+                : await localFallback.RestoreProfileByCodeAsync(connectCode);
+            CurrentSnapshot = BuildCurrentSnapshot();
+            return result;
+        }
+
         public async Task<LeaderboardSnapshot> RefreshRankingsAsync()
         {
             await localFallback.RefreshRankingsAsync();
@@ -244,7 +260,6 @@ namespace BillusBucket
                     statusMessage: nativeMessage);
             }
 
-            // Not invited yet or running outside CrazyGames: honest local personal-best view.
             return localFallback.CurrentSnapshot;
         }
 

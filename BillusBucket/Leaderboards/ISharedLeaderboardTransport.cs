@@ -4,7 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Numerics;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +14,7 @@ namespace BillusBucket
     {
         public string RunId { get; }
         public string AnonymousPlayerId { get; }
+        public string ConnectCode { get; }
         public string DisplayName { get; }
         public BigInteger Score { get; }
         public float RunDurationSeconds { get; }
@@ -26,10 +26,12 @@ namespace BillusBucket
             string displayName,
             BigInteger score,
             float runDurationSeconds,
-            string sourcePlatform)
+            string sourcePlatform,
+            string connectCode = "")
         {
             RunId = runId ?? string.Empty;
             AnonymousPlayerId = anonymousPlayerId ?? string.Empty;
+            ConnectCode = connectCode ?? string.Empty;
             DisplayName = LeaderboardStore.NormalizeName(displayName);
             Score = score < BigInteger.Zero ? BigInteger.Zero : score;
             RunDurationSeconds = float.IsFinite(runDurationSeconds) && runDurationSeconds >= 0f
@@ -39,30 +41,61 @@ namespace BillusBucket
         }
     }
 
+    public sealed class SharedProfileSavePayload
+    {
+        public string AnonymousPlayerId { get; }
+        public string ConnectCode { get; }
+        public string DisplayName { get; }
+        public BigInteger PersonalBest { get; }
+        public string SourcePlatform { get; }
+
+        public SharedProfileSavePayload(
+            string anonymousPlayerId,
+            string connectCode,
+            string displayName,
+            BigInteger personalBest,
+            string sourcePlatform)
+        {
+            AnonymousPlayerId = anonymousPlayerId ?? string.Empty;
+            ConnectCode = connectCode ?? string.Empty;
+            DisplayName = LeaderboardStore.NormalizeName(displayName);
+            PersonalBest = personalBest < BigInteger.Zero ? BigInteger.Zero : personalBest;
+            SourcePlatform = string.IsNullOrWhiteSpace(sourcePlatform) ? "web" : sourcePlatform;
+        }
+    }
+
     public sealed class SharedLeaderboardRemoteResponse
     {
         public bool Success { get; }
         public int? PlayerWeeklyRank { get; }
         public IReadOnlyList<LeaderboardRankEntry> Top10 { get; }
+        public string ProfileDisplayName { get; }
+        public BigInteger? ProfilePersonalBest { get; }
         public string ErrorMessage { get; }
 
         public SharedLeaderboardRemoteResponse(
             bool success,
             int? playerWeeklyRank = null,
             IReadOnlyList<LeaderboardRankEntry> top10 = null,
-            string errorMessage = "")
+            string errorMessage = "",
+            string profileDisplayName = null,
+            BigInteger? profilePersonalBest = null)
         {
             Success = success;
             PlayerWeeklyRank = playerWeeklyRank.HasValue && playerWeeklyRank.Value > 0
                 ? playerWeeklyRank
                 : null;
             Top10 = top10 ?? Array.Empty<LeaderboardRankEntry>();
+            ProfileDisplayName = profileDisplayName;
+            ProfilePersonalBest = profilePersonalBest.HasValue && profilePersonalBest.Value >= BigInteger.Zero
+                ? profilePersonalBest
+                : null;
             ErrorMessage = errorMessage ?? string.Empty;
         }
     }
 
     /// <summary>
-    /// Network transport abstraction for the optional shared weekly leaderboard backend.
+    /// Network transport abstraction for the optional shared weekly leaderboard & cloud profile backend.
     /// Allows unit testing Poki/Shared adapters with zero real network sockets.
     /// </summary>
     public interface ISharedLeaderboardTransport
@@ -73,11 +106,20 @@ namespace BillusBucket
 
         Task<SharedLeaderboardRemoteResponse> SubmitScoreAsync(
             SharedScoreSubmissionPayload payload);
+
+        Task<SharedLeaderboardRemoteResponse> SaveProfileAsync(
+            SharedProfileSavePayload payload) =>
+            Task.FromResult(new SharedLeaderboardRemoteResponse(false, errorMessage: "PROFILE SYNC NOT SUPPORTED"));
+
+        Task<SharedLeaderboardRemoteResponse> RestoreProfileAsync(
+            string connectCode,
+            string sourcePlatform) =>
+            Task.FromResult(new SharedLeaderboardRemoteResponse(false, errorMessage: "RESTORE NOT SUPPORTED"));
     }
 
     /// <summary>
-    /// Trimmer-safe HTTP JSON client for the Supabase Edge Function weekly leaderboard API.
-    /// Uses only public anon headers (never private service_role keys) and a short 4-second timeout.
+    /// Trimmer-safe HTTP JSON client for the Cloudflare Worker + D1 (or Supabase) weekly leaderboard & profile API.
+    /// Uses no private credentials and a short 4-second timeout so gameplay never stalls.
     /// </summary>
     public sealed class HttpSharedLeaderboardTransport : ISharedLeaderboardTransport
     {
@@ -118,12 +160,14 @@ namespace BillusBucket
                 using HttpRequestMessage request = CreateRequest(HttpMethod.Get, requestUrl);
                 using HttpResponseMessage response = await httpClient.SendAsync(request, cts.Token);
 
+                string json = await response.Content.ReadAsStringAsync(cts.Token);
                 if (!response.IsSuccessStatusCode)
                 {
-                    return new SharedLeaderboardRemoteResponse(false, errorMessage: "WEEKLY BOARD UNAVAILABLE");
+                    return new SharedLeaderboardRemoteResponse(
+                        false,
+                        errorMessage: TryExtractServerError(json, "WEEKLY BOARD UNAVAILABLE"));
                 }
 
-                string json = await response.Content.ReadAsStringAsync(cts.Token);
                 return ParseResponseJson(json);
             }
             catch
@@ -142,7 +186,61 @@ namespace BillusBucket
 
             try
             {
-                byte[] jsonBytes = SerializePayload(payload);
+                byte[] jsonBytes = SerializeSubmitPayload(payload);
+                return await SendPostJsonAsync(jsonBytes, "SCORE SAVED LOCALLY", "OFFLINE - SCORE SAVED LOCALLY");
+            }
+            catch
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "OFFLINE - SCORE SAVED LOCALLY");
+            }
+        }
+
+        public async Task<SharedLeaderboardRemoteResponse> SaveProfileAsync(
+            SharedProfileSavePayload payload)
+        {
+            if (payload == null || string.IsNullOrWhiteSpace(endpointUrl))
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "SAVED ON DEVICE");
+            }
+
+            try
+            {
+                byte[] jsonBytes = SerializeSaveProfilePayload(payload);
+                return await SendPostJsonAsync(jsonBytes, "NAME SAVED ON DEVICE", "OFFLINE - SAVED ON DEVICE");
+            }
+            catch
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "OFFLINE - SAVED ON DEVICE");
+            }
+        }
+
+        public async Task<SharedLeaderboardRemoteResponse> RestoreProfileAsync(
+            string connectCode,
+            string sourcePlatform)
+        {
+            if (string.IsNullOrWhiteSpace(connectCode) || string.IsNullOrWhiteSpace(endpointUrl))
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "CLOUD SYNC NOT CONFIGURED");
+            }
+
+            try
+            {
+                byte[] jsonBytes = SerializeRestorePayload(connectCode, sourcePlatform);
+                return await SendPostJsonAsync(jsonBytes, "SAVE CODE NOT FOUND", "OFFLINE - CHECK INTERNET");
+            }
+            catch
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "OFFLINE - CHECK INTERNET");
+            }
+        }
+
+        private async Task<SharedLeaderboardRemoteResponse> SendPostJsonAsync(
+            byte[] jsonBytes,
+            string defaultHttpError,
+            string offlineError)
+        {
+            try
+            {
                 using CancellationTokenSource cts = new CancellationTokenSource(RequestTimeout);
                 using HttpRequestMessage request = CreateRequest(HttpMethod.Post, endpointUrl);
                 request.Content = new ByteArrayContent(jsonBytes);
@@ -153,17 +251,19 @@ namespace BillusBucket
                     };
 
                 using HttpResponseMessage response = await httpClient.SendAsync(request, cts.Token);
+                string json = await response.Content.ReadAsStringAsync(cts.Token);
                 if (!response.IsSuccessStatusCode)
                 {
-                    return new SharedLeaderboardRemoteResponse(false, errorMessage: "SCORE SAVED LOCALLY");
+                    return new SharedLeaderboardRemoteResponse(
+                        false,
+                        errorMessage: TryExtractServerError(json, defaultHttpError));
                 }
 
-                string json = await response.Content.ReadAsStringAsync(cts.Token);
                 return ParseResponseJson(json);
             }
             catch
             {
-                return new SharedLeaderboardRemoteResponse(false, errorMessage: "OFFLINE - SCORE SAVED LOCALLY");
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: offlineError);
             }
         }
 
@@ -179,14 +279,19 @@ namespace BillusBucket
             return request;
         }
 
-        private static byte[] SerializePayload(SharedScoreSubmissionPayload payload)
+        private static byte[] SerializeSubmitPayload(SharedScoreSubmissionPayload payload)
         {
             using MemoryStream buffer = new MemoryStream();
             using (Utf8JsonWriter writer = new Utf8JsonWriter(buffer))
             {
                 writer.WriteStartObject();
+                writer.WriteString("action", "submit_score");
                 writer.WriteString("runId", payload.RunId);
                 writer.WriteString("playerId", payload.AnonymousPlayerId);
+                if (!string.IsNullOrWhiteSpace(payload.ConnectCode))
+                {
+                    writer.WriteString("connectCode", payload.ConnectCode);
+                }
                 writer.WriteString("displayName", payload.DisplayName);
                 writer.WriteString("score", payload.Score.ToString(CultureInfo.InvariantCulture));
                 writer.WriteNumber("durationSeconds", Math.Round(payload.RunDurationSeconds, 2));
@@ -195,6 +300,70 @@ namespace BillusBucket
             }
 
             return buffer.ToArray();
+        }
+
+        private static byte[] SerializeSaveProfilePayload(SharedProfileSavePayload payload)
+        {
+            using MemoryStream buffer = new MemoryStream();
+            using (Utf8JsonWriter writer = new Utf8JsonWriter(buffer))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("action", "save_profile");
+                writer.WriteString("playerId", payload.AnonymousPlayerId);
+                if (!string.IsNullOrWhiteSpace(payload.ConnectCode))
+                {
+                    writer.WriteString("connectCode", payload.ConnectCode);
+                }
+                writer.WriteString("displayName", payload.DisplayName);
+                writer.WriteString("personalBest", payload.PersonalBest.ToString(CultureInfo.InvariantCulture));
+                writer.WriteString("platform", payload.SourcePlatform);
+                writer.WriteEndObject();
+            }
+
+            return buffer.ToArray();
+        }
+
+        private static byte[] SerializeRestorePayload(string connectCode, string sourcePlatform)
+        {
+            using MemoryStream buffer = new MemoryStream();
+            using (Utf8JsonWriter writer = new Utf8JsonWriter(buffer))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("action", "restore_profile");
+                writer.WriteString("connectCode", connectCode);
+                writer.WriteString("platform", string.IsNullOrWhiteSpace(sourcePlatform) ? "web" : sourcePlatform);
+                writer.WriteEndObject();
+            }
+
+            return buffer.ToArray();
+        }
+
+        private static string TryExtractServerError(string json, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return fallback;
+            }
+
+            try
+            {
+                using JsonDocument doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object &&
+                    doc.RootElement.TryGetProperty("error", out JsonElement errProp) &&
+                    errProp.ValueKind == JsonValueKind.String)
+                {
+                    string msg = (errProp.GetString() ?? string.Empty).Trim().ToUpperInvariant();
+                    if (!string.IsNullOrWhiteSpace(msg))
+                    {
+                        return msg.Length > 34 ? msg.Substring(0, 34) : msg;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return fallback;
         }
 
         private static SharedLeaderboardRemoteResponse ParseResponseJson(string json)
@@ -218,6 +387,30 @@ namespace BillusBucket
                 parsedRank > 0)
             {
                 playerRank = parsedRank;
+            }
+
+            string profileDisplayName = null;
+            if (root.TryGetProperty("displayName", out JsonElement profileNameProp) &&
+                profileNameProp.ValueKind == JsonValueKind.String)
+            {
+                string rawProfileName = profileNameProp.GetString();
+                if (!string.IsNullOrWhiteSpace(rawProfileName))
+                {
+                    profileDisplayName = LeaderboardStore.NormalizeName(rawProfileName);
+                }
+            }
+
+            BigInteger? profileBest = null;
+            if (root.TryGetProperty("personalBest", out JsonElement profileBestProp))
+            {
+                string rawBest = profileBestProp.ValueKind == JsonValueKind.String
+                    ? (profileBestProp.GetString() ?? string.Empty)
+                    : profileBestProp.GetRawText();
+                if (BigInteger.TryParse(rawBest, NumberStyles.Integer, CultureInfo.InvariantCulture, out BigInteger parsedBest) &&
+                    parsedBest >= BigInteger.Zero)
+                {
+                    profileBest = parsedBest;
+                }
             }
 
             List<LeaderboardRankEntry> entries = new List<LeaderboardRankEntry>();
@@ -275,7 +468,9 @@ namespace BillusBucket
             return new SharedLeaderboardRemoteResponse(
                 success: true,
                 playerWeeklyRank: playerRank,
-                top10: entries);
+                top10: entries,
+                profileDisplayName: profileDisplayName,
+                profilePersonalBest: profileBest);
         }
     }
 }
