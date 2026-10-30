@@ -145,6 +145,8 @@ local function sideWalk(step)
  line(a,13,18,17,18,'ink');px(a,17,17,'ink')
  rect(a,9,17,4,6,'ink');rect(a,10,18,2,4,'goldshade')
  line(a,10,18,10,20,'gold')
+ -- The scarf edge is the silhouette here; remove the shirt strip behind it.
+ rect(a,7,18,2,5,nil)
  return outlineBillu(simplifyBillu(a))
 end
 local function billu(side,step,burn)
