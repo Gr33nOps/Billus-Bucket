@@ -83,6 +83,23 @@ local function simplifyBillu(a)
  end end
  return a
 end
+-- Close the silhouette after all face, sleeve and scarf pixels have been painted.
+-- Collect edges first so the result does not depend on scan direction.
+local function outlineBillu(a)
+ local edges={}
+ for y=0,a.height-1 do for x=0,a.width-1 do
+  if a:getPixel(x,y)~=0 and a:getPixel(x,y)~=col('ink') then
+   local exposed=x==0 or x==a.width-1 or y==0 or y==a.height-1
+   if not exposed then
+    exposed=a:getPixel(x-1,y)==0 or a:getPixel(x+1,y)==0 or
+            a:getPixel(x,y-1)==0 or a:getPixel(x,y+1)==0
+   end
+   if exposed then edges[#edges+1]={x,y} end
+  end
+ end end
+ for _,point in ipairs(edges) do px(a,point[1],point[2],'ink') end
+ return a
+end
 local function sideWalk(step)
  local a=img(24,32)
  -- Profile gait: far leg first, near leg in front, alternating contacts.
@@ -124,7 +141,7 @@ local function sideWalk(step)
  line(a,9,16,17,16,'ink');line(a,10,17,16,17,'gold')
  rect(a,9,17,4,6,'ink');rect(a,10,18,2,4,'goldshade')
  line(a,10,18,10,20,'gold')
- return simplifyBillu(a)
+ return outlineBillu(simplifyBillu(a))
 end
 local function billu(side,step,burn)
  if side and not burn then return sideWalk(step) end
@@ -202,7 +219,7 @@ local function billu(side,step,burn)
  line(a,8,17,16,17,'goldshade');line(a,10,17,15,17,'gold')
  rect(a,15,17,4,6,'ink');rect(a,16,18,2,4,'goldshade')
  line(a,16,18,16,20,'gold');px(a,17,18,'goldlight')
- return simplifyBillu(a)
+ return outlineBillu(simplifyBillu(a))
 end
 local carry={};for row=0,1 do for f=0,3 do local a=img(32,48);paste(a,bucket,2,0);paste(a,billu(row==1,f,false),4,12);carry[#carry+1]=a end end
 saveFrames('billu-carry',carry,32,48,{{'straight',1,4},{'walk',5,8}})

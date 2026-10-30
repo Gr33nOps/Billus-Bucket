@@ -80,11 +80,17 @@ namespace BillusBucket.Web.Pages
             string[] assetPaths = InMemoryAssetStreamProvider.RequiredAssets;
             Task<byte[]>[] downloads = new Task<byte[]>[assetPaths.Length];
             string assetVersion = await JsRuntime.InvokeAsync<string>("billuPlatform.getAssetVersion");
+            // The pixel art is tiny. A per-load image revision avoids stale character
+            // sprites during the GitHub Pages cache window without reloading large WAVs.
+            string imageRevision = Guid.NewGuid().ToString("N");
 
             for (int i = 0; i < assetPaths.Length; i++)
             {
+                string revision = assetPaths[i].EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                    ? assetVersion + "-" + imageRevision
+                    : assetVersion;
                 downloads[i] = Http.GetByteArrayAsync(
-                    "Assets/" + assetPaths[i] + "?v=" + Uri.EscapeDataString(assetVersion));
+                    "Assets/" + assetPaths[i] + "?v=" + Uri.EscapeDataString(revision));
             }
 
             await Task.WhenAll(downloads);
