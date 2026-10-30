@@ -488,6 +488,25 @@ for glyph,rows in fontText:gmatch("%['(.)'%]%s*=%s*new%[%]%s*{(.-)}") do
  index=index+1
 end
 saveFrames('ui-font',{atlas},128,32)
+-- Browser loading logo uses the same authored glyphs and palette as the game.
+local glyphs={}
+for glyph,rows in fontText:gmatch("%['(.)'%]%s*=%s*new%[%]%s*{(.-)}") do
+ local pattern={};for row in rows:gmatch('"([01]+)"') do pattern[#pattern+1]=row end
+ glyphs[glyph]=pattern
+end
+glyphs["'"]={"1","1"}
+local logo=img(128,12);local title="BILLU'S BUCKET";local width=0
+for i=1,#title do local g=glyphs[title:sub(i,i)];width=width+(g and #g[1]+1 or 4) end
+local x=math.floor((128-width+1)/2)
+for i=1,#title do
+ local g=glyphs[title:sub(i,i)]
+ if g then
+  for y,row in ipairs(g) do for xx=1,#row do if row:sub(xx,xx)=='1' then px(logo,x+xx,3+y,'ink') end end end
+  for y,row in ipairs(g) do for xx=1,#row do if row:sub(xx,xx)=='1' then px(logo,x+xx-1,2+y,'goldlight') end end end
+  x=x+#g[1]+1
+ else x=x+4 end
+end
+saveFrames('loading-logo',{logo},128,12)
 local audioIcons={}
 for f=0,3 do local a=img(20,16)
  local edge={{2,0},{17,0},{19,2},{19,13},{17,15},{2,15},{0,13},{0,2}}

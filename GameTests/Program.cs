@@ -341,6 +341,19 @@ namespace GameTests
 
         private static void TestBucketControl()
         {
+            BucketControl sliding = new BucketControl(160f, 1000f, 24f);
+            sliding.Update(0.5f, 1, null);
+            float releaseX = sliding.X;
+            sliding.Update(0.15f, 0, null);
+            Equal(true, sliding.VelocityX > 25f, "release retains a short readable slide");
+            sliding.Update(0.15f, 0, null);
+            Equal(true, sliding.VelocityX == 0f && sliding.X - releaseX > 13f && sliding.X - releaseX < 18f,
+                "slide stops within a controlled distance");
+            sliding.Update(0.5f, 1, null);
+            sliding.Update(0.15f, -1, null);
+            Equal(true, sliding.VelocityX > 0f, "reversing needs a brief braking commitment");
+            sliding.Update(0.1f, -1, null);
+            Equal(true, sliding.VelocityX < 0f, "reversal remains responsive within a quarter second");
             BucketControl bucket = new BucketControl(180f, 360f, 44f);
             bucket.Update(1f / 60f, 1, null);
             Equal(true, bucket.X > 180f && bucket.X < 184f,

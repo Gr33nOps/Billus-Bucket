@@ -13,10 +13,12 @@
 </head>
 
 <body>
-    <div id="loadingOverlay">
-        <div class="loading-card">
-            <div class="loading-title">BILLU'S BUCKET</div>
-            <div class="loading-subtitle">LOADING ROOFTOP...</div>
+    <div id="loadingOverlay" role="status" aria-label="Loading Billu's Bucket">
+        <div class="loading-scene">
+            <img class="loading-logo" src="Assets/loading-logo.png?v=__BILLU_ASSET_VERSION__" alt="Billu's Bucket" width="128" height="12" />
+            <img class="loading-bucket" src="Assets/bucket.png?v=__BILLU_ASSET_VERSION__" alt="" width="28" height="16" />
+            <div class="loading-steps" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="loading-subtitle">GETTING THE ROOFTOP READY<span class="loading-dots">...</span></div>
         </div>
     </div>
 

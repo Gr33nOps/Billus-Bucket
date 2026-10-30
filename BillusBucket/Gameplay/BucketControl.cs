@@ -9,9 +9,9 @@ namespace BillusBucket
     public sealed class BucketControl
     {
         private const float MaxSpeed = 135f;
-        private const float Acceleration = 750f;
-        private const float TurnAcceleration = 1100f;
-        private const float Braking = 950f;
+        private const float Acceleration = 650f;
+        private const float TurnAcceleration = 850f;
+        private const float Braking = 600f;
         private const float MaxPhysicsStep = 1f / 60f;
 
         private readonly float minX;
