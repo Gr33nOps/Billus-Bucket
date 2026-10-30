@@ -15,7 +15,7 @@ namespace BillusBucket
     /// </summary>
     public sealed class BilluAnimator
     {
-        private const float WalkSpeedThreshold = 20f;
+        private const float WalkSpeedThreshold = 1f;
         private const float WalkFrameDuration = 0.11f;
         private const int WalkFrameCount = 4;
 

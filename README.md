@@ -11,7 +11,8 @@ Guide Billu across the rooftop to catch floating rupee notes (`Rs 10` to `Rs 5,0
 - **Move**: `Left` / `Right`, `A` / `D`, mouse drag, or mobile touch drag
 - **Start / Resume / Retry**: `Enter`, `Space`, or click/tap the button
 - **Leaderboard**: Click/tap the top-right trophy icon button (below the speaker button) or press `L` on the Ready or Game-Over screen
-- **Pause**: `P` or `Esc`
+- **Pause / Resume**: `P`, `Esc`, or the top-right pause/play icon above the music button
+- **Mobile**: Turn the phone sideways to play. Portrait orientation shows a rotate prompt and pauses an active run.
 - **Mute All Audio**: `M` (or click/tap the top-right music and sound buttons)
 
 ## Project Structure

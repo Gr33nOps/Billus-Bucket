@@ -17,6 +17,27 @@ html, body {
     overflow: hidden;
 }
 
+#rotatePrompt { display: none; }
+@media (orientation: portrait) and (pointer: coarse) {
+    #rotatePrompt {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #232438;
+        color: #f0d398;
+        font-family: monospace;
+        text-align: center;
+        padding: 24px;
+    }
+    #rotatePrompt img { image-rendering: pixelated; }
+    #rotatePrompt p { font-weight: bold; font-size: 16px; }
+    #rotatePrompt span { color: #c0b4c7; font-size: 12px; }
+}
+
 #canvasHolder {
     position: fixed;
     inset: 0;

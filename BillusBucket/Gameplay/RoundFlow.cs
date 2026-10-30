@@ -43,7 +43,7 @@ namespace BillusBucket
     /// </summary>
     public sealed class RoundFlow
     {
-        public static readonly ButtonBounds TopRightLeaderboardButton = new ButtonBounds(292, 50, 20, 16);
+        public static readonly ButtonBounds TopRightLeaderboardButton = new ButtonBounds(292, 71, 20, 16);
 
         private static readonly ButtonBounds CenterMenuButton = new ButtonBounds(126, 85, 68, 18);
         private static readonly ButtonBounds LeaderboardBackButton = new ButtonBounds(126, 148, 68, 18);

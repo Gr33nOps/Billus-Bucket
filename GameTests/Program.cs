@@ -220,7 +220,7 @@ namespace GameTests
             // Accessible from Ready screen via the top-right trophy icon button (below speaker button)
             ButtonBounds readyLb = flow.LeaderboardButton;
             Equal(292, readyLb.X, "leaderboard icon aligns with top-right audio buttons");
-            Equal(50, readyLb.Y, "leaderboard icon sits directly below the speaker button");
+            Equal(71, readyLb.Y, "leaderboard icon sits directly below the speaker button");
             Equal(true, readyLb.Width > 0, "Ready screen exposes top-right leaderboard icon button");
             Equal(true, flow.TryOpenLeaderboardAt(readyLb.X + 6, readyLb.Y + 6), "leaderboard opens from Ready");
             Equal(true, flow.IsLeaderboardOpen, "leaderboard state is open");
@@ -259,6 +259,11 @@ namespace GameTests
         {
             BilluAnimator billu = new BilluAnimator();
             Equal(BilluAction.Straight, billu.Action, "Billu faces forward while still");
+            billu.Update(0.15f, 3f);
+            Equal(BilluAction.WalkRight, billu.Action, "slow movement still uses the right walking pose");
+            billu.Update(0.15f, -3f);
+            Equal(BilluAction.WalkLeft, billu.Action, "slow movement still uses the left walking pose");
+            billu.Reset();
             Equal(0, billu.Frame, "straight pose stays on one frame");
 
             billu.Update(0.15f, 160f);
@@ -346,8 +351,8 @@ namespace GameTests
             float releaseX = sliding.X;
             sliding.Update(0.15f, 0, null);
             Equal(true, sliding.VelocityX > 25f, "release retains a short readable slide");
-            sliding.Update(0.15f, 0, null);
-            Equal(true, sliding.VelocityX == 0f && sliding.X - releaseX > 17f && sliding.X - releaseX < 21f,
+            sliding.Update(0.25f, 0, null);
+            Equal(true, sliding.VelocityX == 0f && sliding.X - releaseX > 21f && sliding.X - releaseX < 25f,
                 "slide stops within a controlled distance");
             sliding.Update(0.5f, 1, null);
             sliding.Update(0.15f, -1, null);

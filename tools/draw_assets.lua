@@ -523,16 +523,20 @@ for i=1,#title do
 end
 saveFrames('loading-logo',{logo},128,12)
 local audioIcons={}
-for f=0,3 do local a=img(20,16)
+for f=0,5 do local a=img(20,16)
  local edge={{2,0},{17,0},{19,2},{19,13},{17,15},{2,15},{0,13},{0,2}}
  poly(a,edge,0x34536f);contour(a,edge,'ink');line(a,3,1,16,1,0x77b7c8)
  if f<2 then
   rect(a,8,4,2,7,'white');rect(a,9,3,5,2,'white');rect(a,12,4,2,3,'white');oval(a,5,9,5,4,'white')
- else
+ elseif f<4 then
   rect(a,4,6,3,5,'white');poly(a,{{7,6},{10,4},{10,12},{7,10}},'white')
   line(a,13,5,15,7,'white');line(a,15,7,15,9,'white');line(a,15,9,13,11,'white')
+ elseif f==4 then
+  rect(a,6,4,3,8,'white');rect(a,11,4,3,8,'white')
+ else
+  poly(a,{{7,4},{13,8},{7,12}},'white')
  end
- if f%2==1 then
+ if f<4 and f%2==1 then
   -- Muted state is visibly neutral even at native size.
   for y=0,15 do for x=0,19 do
    local c=a:getPixel(x,y)

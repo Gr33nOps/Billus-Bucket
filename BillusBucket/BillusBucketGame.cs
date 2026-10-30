@@ -46,8 +46,9 @@ namespace BillusBucket
         private const int NoteFrameHeight = 8;
 
         // Top-right HUD icon button hitboxes (in 320x180 canvas coordinates)
-        private static readonly ButtonBounds MusicButton = new ButtonBounds(292, 8, 20, 16);
-        private static readonly ButtonBounds SfxButton = new ButtonBounds(292, 29, 20, 16);
+        private static readonly ButtonBounds PauseButton = new ButtonBounds(292, 8, 20, 16);
+        private static readonly ButtonBounds MusicButton = new ButtonBounds(292, 29, 20, 16);
+        private static readonly ButtonBounds SfxButton = new ButtonBounds(292, 50, 20, 16);
         private static readonly ButtonBounds LeaderboardIconButton = RoundFlow.TopRightLeaderboardButton;
 
         // UI palette colors (matched to tools/draw_assets.lua & ui-sign.png)
@@ -331,7 +332,7 @@ namespace BillusBucket
             }
 
             // Automatically pause an active run if the player switches to another window or tab.
-            if (!IsActive)
+            if (!IsActive || platformBridge.IsExternalAudioMuted)
             {
                 bool wasPlaying = CurrentPhase == RoundPhase.Playing;
                 flow.OnFocusLost();
@@ -348,14 +349,22 @@ namespace BillusBucket
                 return;
             }
 
-            // Check top-right audio mute buttons first.
+            bool pauseRequested = false;
+            // Handle the HUD before allowing a pointer to control Billu.
             if (clicked || tapped)
             {
                 Point tapPoint = tapped
                     ? ScreenToCanvas(touch[0].Position.X, touch[0].Position.Y, canvasViewport)
                     : ScreenToCanvas(mouse.X, mouse.Y, canvasViewport);
 
-                if (MusicButton.Contains(tapPoint.X, tapPoint.Y))
+                if (PauseButton.Contains(tapPoint.X, tapPoint.Y))
+                {
+                    pauseRequested = CurrentPhase == RoundPhase.Playing || CurrentPhase == RoundPhase.Paused;
+                    ignorePointerUntilRelease = true;
+                    clicked = false;
+                    tapped = false;
+                }
+                else if (MusicButton.Contains(tapPoint.X, tapPoint.Y))
                 {
                     musicMuted = !musicMuted;
                     audio?.SetMuted(musicMuted, sfxMuted);
@@ -406,7 +415,7 @@ namespace BillusBucket
             }
             else if (CurrentPhase == RoundPhase.Playing)
             {
-                if (WasKeyJustPressed(keys, Keys.Escape) || WasKeyJustPressed(keys, Keys.P))
+                if (pauseRequested || WasKeyJustPressed(keys, Keys.Escape) || WasKeyJustPressed(keys, Keys.P))
                 {
                     flow.TogglePause();
                 }
@@ -417,7 +426,7 @@ namespace BillusBucket
             }
             else if (CurrentPhase == RoundPhase.Paused)
             {
-                if (WasKeyJustPressed(keys, Keys.Escape) || WasKeyJustPressed(keys, Keys.P))
+                if (pauseRequested || WasKeyJustPressed(keys, Keys.Escape) || WasKeyJustPressed(keys, Keys.P))
                 {
                     flow.TogglePause();
                 }
@@ -774,7 +783,7 @@ namespace BillusBucket
 
         private static bool IsTopRightHudButton(Point canvasPoint)
         {
-            return MusicButton.Contains(canvasPoint.X, canvasPoint.Y) ||
+            return PauseButton.Contains(canvasPoint.X, canvasPoint.Y) || MusicButton.Contains(canvasPoint.X, canvasPoint.Y) ||
                    SfxButton.Contains(canvasPoint.X, canvasPoint.Y) ||
                    LeaderboardIconButton.Contains(canvasPoint.X, canvasPoint.Y);
         }
@@ -1163,6 +1172,10 @@ namespace BillusBucket
             BigInteger bestScore = GetCurrentBestScore();
             DrawHudAmount(bestScore, 45, BestValueColor);
 
+            bool pauseAvailable = CurrentPhase == RoundPhase.Playing || CurrentPhase == RoundPhase.Paused;
+            batch.Draw(uiAudio, new Vector2(PauseButton.X, PauseButton.Y),
+                new Rectangle(CurrentPhase == RoundPhase.Paused ? 100 : 80, 0, 20, 16),
+                pauseAvailable ? Color.White : new Color(130, 125, 145));
             Rectangle musicIconRect = new Rectangle(musicMuted ? 20 : 0, 0, 20, 16);
             batch.Draw(uiAudio, new Vector2(MusicButton.X, MusicButton.Y), musicIconRect, Color.White);
 

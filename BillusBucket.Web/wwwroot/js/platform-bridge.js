@@ -360,7 +360,8 @@
     }
 
     function isExternalAudioMuted() {
-        return externalAudioMuted || document.hidden === true;
+        return externalAudioMuted || document.hidden === true ||
+            Boolean(window.matchMedia?.("(orientation: portrait) and (pointer: coarse)").matches);
     }
 
     function getAssetVersion() {
