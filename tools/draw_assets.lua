@@ -54,6 +54,9 @@ oval(bucket,0,0,28,7,'ink');oval(bucket,2,1,24,5,'bluelight')
 oval(bucket,4,2,20,3,'ink')
 rect(bucket,4,5,20,1,'bluelight');rect(bucket,7,6,14,1,'blue')
 saveFrames('bucket',{bucket},28,16)
+-- Square browser icon: preserve the exact game's 28x16 bucket proportions.
+local favicon=img(32,32);paste(favicon,bucket,2,8)
+saveFrames('favicon',{favicon},32,32)
 
 -- Inverted wreck: compressed base, crumpled side, split and bent ground-facing rim.
 local wreck=img(28,16)
@@ -112,7 +115,7 @@ local function sideWalk(step)
  poly(a,{{12,23},{16,23},{front+3,fy-1},{front,fy-1}},'ink')
  line(a,14,26,front+1,fy-2,'pants');line(a,15,26,front+2,fy-2,'pants')
  local frontSandalY=math.min(fy,29)
- rect(a,front,frontSandalY,6,3,'ink');rect(a,front+1,frontSandalY+1,4,1,'goldshade')
+ rect(a,front,frontSandalY,6,3,'ink');rect(a,front+1,frontSandalY+1,4,1,'shoe')
  -- Sleeves reach the bucket; only the small hands at its rim are exposed.
  poly(a,{{1,0},{4,0},{4,5},{8,9},{10,13},{7,15},{3,10},{1,6}},'ink')
  poly(a,{{2,4},{3,4},{3,6},{6,9},{9,13},{7,14},{3,10},{2,7}},'teal')
@@ -159,7 +162,7 @@ local function billu(side,step,burn)
  rect(a,lx+1,27,2,ly-26,'pants');rect(a,rx+1,27,2,ry-26,'pants')
  local leftSandalY=math.min(ly,29);local rightSandalY=math.min(ry,29)
  rect(a,lx-1,leftSandalY,6,3,'ink');rect(a,rx,rightSandalY,6,3,'ink')
- rect(a,lx,leftSandalY+1,4,1,'goldshade');rect(a,rx+1,rightSandalY+1,4,1,'goldshade')
+ rect(a,lx,leftSandalY+1,4,1,'shoe');rect(a,rx+1,rightSandalY+1,4,1,'shoe')
  rect(a,6,23,13,5,'ink');rect(a,7,23,5,4,'pants');rect(a,13,23,5,4,'pants')
  rect(a,7,24,4,1,'pantslight');rect(a,14,24,3,1,'pantslight')
  if side then
