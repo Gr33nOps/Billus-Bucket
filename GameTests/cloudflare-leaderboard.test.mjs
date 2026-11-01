@@ -308,7 +308,7 @@ test("end-to-end D1 SQLite submission, deduplication, best-score retention, and 
   }
 });
 
-test("rate limiting enforces 6 writes/min and atomic batch rolls back failed SQL constraints", async () => {
+test("rate limiting enforces 8 writes/min and atomic batch rolls back failed SQL constraints", async () => {
   const db = createD1SqliteMock();
   try {
     // Verify SQLite atomic rollback on CHECK violation

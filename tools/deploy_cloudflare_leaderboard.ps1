@@ -59,6 +59,13 @@ try {
         throw "Failed to apply schema.sql to remote D1 database."
     }
 
+    # schema.sql creates new tables but cannot update constraints on existing ones.
+    # Wrangler records applied migrations, so upgrades run exactly once.
+    npx --yes wrangler@4 d1 migrations apply $DatabaseName --remote
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to apply D1 database migrations; Worker was not deployed."
+    }
+
     Write-Host "4/5 Deploying Cloudflare Worker..."
     $deployOutput = npx --yes wrangler@4 deploy 2>&1 | Tee-Object -Variable deployLines | Out-String
     if ($LASTEXITCODE -ne 0) {

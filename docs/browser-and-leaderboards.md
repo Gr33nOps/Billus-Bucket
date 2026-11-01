@@ -6,7 +6,7 @@
 - **Browser WebAssembly target (`BillusBucket.Web/BillusBucket.Web.csproj`)**: Uses **KNI BlazorGL** (`nkast.Kni.Platform.Blazor.GL` `4.3.9001` on `Microsoft.NET.Sdk.BlazorWebAssembly`), which implements the exact `Microsoft.Xna.Framework.*` APIs on WebGL and WebAudio.
 - **Single-source-of-truth gameplay & assets**:
   - `BillusBucket.Web` compiles the exact same C# gameplay, physics, animation, audio, UI, and leaderboard source files from `BillusBucket/` without duplicating code.
-  - All 10 PNG sprites and 8 WAV sounds in `BillusBucket/Assets/` are synced automatically into `wwwroot/Assets/` at build time and preloaded asynchronously into `InMemoryAssetStreamProvider` before `BillusBucketGame` starts.
+  - The PNG sprites and WAV sounds in `BillusBucket/Assets/` are synced automatically into `wwwroot/Assets/` at build time and preloaded asynchronously into `InMemoryAssetStreamProvider` before `BillusBucketGame` starts.
   - The native `320×180` pixel-art `RenderTarget2D` is scaled to the largest centered `16:9` frame inside any browser or mobile viewport using `SamplerState.PointClamp` (nearest-neighbor filtering), preserving crisp square pixels and mapping mouse/touch coordinates 1:1.
 
 ---
@@ -31,11 +31,15 @@ Core gameplay depends only on `ILeaderboardService` and `IGamePlatformBridge`. `
 
 ## 3. Shared Online Leaderboard Backends (Cloudflare Workers + D1 or Supabase)
 
-Two drop-in server implementations are included that speak the exact same JSON protocol (`GET ?limit=10&playerId=...` and `POST { runId, playerId, displayName, score, durationSeconds, platform }`):
+Both backends support the weekly-score JSON protocol (`GET ?limit=10&playerId=...` and `POST { runId, playerId, displayName, score, durationSeconds, platform }`):
 - **Recommended free non-pausing backend (`backend/cloudflare/`)**: **Cloudflare Workers + Cloudflare D1 (SQLite)**. Requires no credit card, never auto-pauses when idle, needs zero client API keys (`sharedLeaderboardPublicKey: ""`), and can be deployed in one command via `pwsh ./tools/deploy_cloudflare_leaderboard.ps1` (see `backend/cloudflare/README.md`).
 - **Alternative PostgreSQL backend (`backend/supabase/`)**: **Supabase (Postgres + Edge Function)**.
 
-### Evaluation
+### Cloud profiles
+
+Custom names, profile backups, and cross-device Save Codes currently require the Cloudflare backend. The optional Supabase backend supports weekly scores only; it does not implement `save_profile` or `restore_profile`. Google Play Games and Apple Game Center authentication are not implemented.
+
+### Supabase evaluation
 A small **Supabase (Postgres + Edge Function)** backend is well suited for a lightweight arcade game across approved web portals:
 - **Why an Edge Function instead of direct client table writes**: Direct PostgREST table inserts from a browser expose table write permissions to anyone holding the public `anon` key. Routing all requests through `/functions/v1/leaderboard` (`backend/supabase/functions/leaderboard/index.ts`) keeps `SUPABASE_SERVICE_ROLE_KEY` and `PLAYER_HASH_SALT` strictly server-side while Row-Level Security (RLS) blocks direct table access.
 - **Zero accounts or PII**: The client generates a random UUID stored locally and derives a deterministic non-personal tag (`BILLU_1000`..`BILLU_9999`). The server hashes the UUID with a secret salt (`SHA-256`) so player identifiers cannot be enumerated or correlated across games, and rejects unmoderated free-text names.

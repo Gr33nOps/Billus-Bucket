@@ -31,6 +31,7 @@ function setup(view = null) {
       navigator: {
         clipboard: {
           writeText(value) {
+            if (view?.clipboardDenied) return Promise.reject(new Error("Permission denied"));
             copiedClipboardText = value;
             return Promise.resolve();
           },
@@ -148,10 +149,10 @@ test("mobile uses smaller viewport measurement and reserves a bottom margin", ()
   assert(bounds.y + bounds.height <= 268);
 });
 
-test("copyTextToClipboard copies Save Code cleanly and rejects empty input", () => {
+test("copyTextToClipboard copies Save Code cleanly and rejects empty input", async () => {
   const s = setup();
-  assert.equal(s.api.copyTextToClipboard(""), false);
-  assert.equal(s.api.copyTextToClipboard("  K7P4-M9X2-W3R8  "), true);
+  assert.equal(await s.api.copyTextToClipboardAsync(""), false);
+  assert.equal(await s.api.copyTextToClipboardAsync("  K7P4-M9X2-W3R8  "), true);
   assert.equal(s.getCopiedText(), "K7P4-M9X2-W3R8");
 });
 
@@ -161,4 +162,9 @@ test("consumePastedText returns single-use pasted text for Ctrl+V or paste butto
   s.api.recordPastedText("  K7P4-M9X2-W3R8  ");
   assert.equal(s.api.consumePastedText(), "K7P4-M9X2-W3R8");
   assert.equal(s.api.consumePastedText(), "");
+});
+
+test("clipboard denial never reports a copied Save Code", async () => {
+  const s = setup({clipboardDenied:true});
+  assert.equal(await s.api.copyTextToClipboardAsync("K7P4-M9X2-W3R8"), false);
 });

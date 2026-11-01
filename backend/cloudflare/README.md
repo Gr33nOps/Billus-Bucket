@@ -15,7 +15,7 @@ pwsh ./tools/deploy_cloudflare_leaderboard.ps1
 What this script does automatically:
 1. Opens your browser once to log into your free Cloudflare account (`wrangler login`).
 2. Creates the `billus-bucket-leaderboard` D1 SQLite database and binds its UUID in `wrangler.jsonc`.
-3. Runs `schema.sql` against the remote D1 database.
+3. Runs `schema.sql`, then applies tracked D1 migrations to upgrade existing databases without dropping scores.
 4. Deploys `src/index.mjs` and generates a secure 64-character `PLAYER_HASH_SALT` secret (never stored in git or client files).
 5. Writes your live `https://billus-bucket-leaderboard.<your-subdomain>.workers.dev` URL into `BillusBucket.Web/wwwroot/platform-config.js`.
 
@@ -48,3 +48,9 @@ After running it, commit and push `BillusBucket.Web/wwwroot/platform-config.js` 
      sharedLeaderboardPublicKey: ""
      ```
    - Commit and push to `main` to publish to GitHub Pages.
+
+## Upgrading an existing database
+
+Use the deployment script, which runs `wrangler d1 migrations apply` before deploying the Worker. For a dashboard-only upgrade from the original backend, run `migrations/0002_profiles_and_custom_names.sql` once before deploying the profile-enabled Worker. Re-running `schema.sql` alone does not update existing table constraints.
+
+Save Codes act as profile credentials. They restore profiles without email or platform sign-in; never publish a real player's code. Client-submitted scores have basic validation and rate limits, but are not server-verified gameplay.

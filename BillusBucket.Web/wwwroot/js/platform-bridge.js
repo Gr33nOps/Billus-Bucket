@@ -116,15 +116,21 @@
         } catch (_err) {
         }
 
+        return copied;
+    }
+
+    async function copyTextToClipboardAsync(text) {
+        const value = String(text ?? "").trim();
+        if (!value) return false;
+        if (copyTextToClipboard(value)) return true;
         try {
             if (window.navigator?.clipboard?.writeText) {
-                window.navigator.clipboard.writeText(value).catch(function () {});
-                copied = true;
+                await window.navigator.clipboard.writeText(value);
+                return true;
             }
         } catch (_err) {
         }
-
-        return copied;
+        return false;
     }
 
     let pendingPastedText = null;
@@ -513,6 +519,7 @@
         storageGet: storageGet,
         storageSet: storageSet,
         copyTextToClipboard: copyTextToClipboard,
+        copyTextToClipboardAsync: copyTextToClipboardAsync,
         requestClipboardPaste: requestClipboardPaste,
         consumePastedText: consumePastedText,
         recordPastedText: recordPastedText,

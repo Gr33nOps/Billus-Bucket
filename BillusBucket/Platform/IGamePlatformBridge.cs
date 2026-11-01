@@ -46,6 +46,7 @@ namespace BillusBucket
         void NotifyGameplayStart();
         void NotifyGameplayStop();
         bool TryCopyTextToClipboard(string text) => false;
+        Task<bool> CopyTextToClipboardAsync(string text) => Task.FromResult(TryCopyTextToClipboard(text));
         bool RequestClipboardPaste() => false;
         bool TryConsumePastedText(out string text)
         {
@@ -162,6 +163,8 @@ namespace BillusBucket
         {
             return inner.TryCopyTextToClipboard(text);
         }
+
+        public Task<bool> CopyTextToClipboardAsync(string text) => inner.CopyTextToClipboardAsync(text);
 
         public bool RequestClipboardPaste()
         {

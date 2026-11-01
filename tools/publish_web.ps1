@@ -44,7 +44,10 @@ if (Test-Path $OutputDir) {
 }
 
 Write-Host "Publishing BillusBucket.Web (Release) for platform '$Platform'..."
-dotnet publish $webProject -c Release -o $publishTemp
+# An absolute PublishDir containing an apostrophe breaks MSBuild item transforms.
+# Keep this property relative to the project; the validated output remains under dist.
+$relativePublishDir = [IO.Path]::GetRelativePath((Split-Path -Parent $webProject), $publishTemp).Replace('\', '/') + '/'
+dotnet publish $webProject -c Release "-p:PublishDir=$relativePublishDir"
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
 }

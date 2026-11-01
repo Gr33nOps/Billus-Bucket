@@ -132,8 +132,19 @@ namespace BillusBucket.Web
                     return jsInProcess.Invoke<bool>("billuPlatform.copyTextToClipboard", text);
                 }
 
-                _ = jsRuntime.InvokeVoidAsync("billuPlatform.copyTextToClipboard", text);
-                return true;
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> CopyTextToClipboardAsync(string text)
+        {
+            try
+            {
+                return await jsRuntime.InvokeAsync<bool>("billuPlatform.copyTextToClipboardAsync", text);
             }
             catch
             {

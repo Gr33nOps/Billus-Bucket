@@ -802,6 +802,25 @@ namespace GameTests
             Equal("15760", deviceB.GetPersonalBest().ToString(), "second device restores cloud personal best");
             Equal(deviceACode, deviceB.PlayerConnectCode, "second device links to canonical Save Code");
 
+            // An earlier request must not replace the restored player's rank or best.
+            var pendingFetch = new TaskCompletionSource<SharedLeaderboardRemoteResponse>();
+            cloudTransport.PendingFetch = pendingFetch.Task;
+            Task<LeaderboardSnapshot> oldRefresh = deviceB.RefreshRankingsAsync();
+            deviceB.RestoreProfileByCodeAsync(deviceACode).GetAwaiter().GetResult();
+            pendingFetch.SetResult(new SharedLeaderboardRemoteResponse(true,
+                playerWeeklyRank: 99, profilePersonalBest: 999990));
+            oldRefresh.GetAwaiter().GetResult();
+            Equal(1, deviceB.CurrentSnapshot.CurrentPlayerWeeklyRank,
+                "stale refresh cannot replace restored profile rank");
+            Equal(new BigInteger(15760), deviceB.GetPersonalBest(),
+                "stale refresh cannot import previous profile best");
+
+            cloudTransport.SimulateOffline = true;
+            ProfileSyncResult offlineName = deviceB.UpdatePlayerNameAsync("LOCAL_ACE").GetAwaiter().GetResult();
+            Equal(false, offlineName.SyncedOnline, "offline name save is not claimed as cloud sync");
+            Equal(false, deviceB.CurrentSnapshot.IsLoading, "offline name save ends loading state");
+            Equal(false, deviceB.CurrentSnapshot.IsOnlineAvailable, "offline name save clears online status");
+
             // 4. Restricted storage resilience & Poki zero-network compliance for custom names
             LocalLeaderboardService restrictedLocal = new LocalLeaderboardService(new ThrowingScoreStorage());
             ProfileSyncResult restrictedNameRes = restrictedLocal.UpdatePlayerNameAsync("BILLU_PRO").GetAwaiter().GetResult();
@@ -865,6 +884,7 @@ namespace GameTests
             private readonly Dictionary<string, (string Name, BigInteger Best)> cloudProfiles =
                 new Dictionary<string, (string Name, BigInteger Best)>(StringComparer.Ordinal);
 
+            public Task<SharedLeaderboardRemoteResponse> PendingFetch { get; set; }
             public bool SimulateOffline { get; set; }
             public int FetchCount { get; private set; }
             public int SubmitCount { get; private set; }
@@ -876,6 +896,7 @@ namespace GameTests
                 string sourcePlatform)
             {
                 FetchCount++;
+                if (PendingFetch != null) return PendingFetch;
                 if (SimulateOffline)
                 {
                     return Task.FromResult(new SharedLeaderboardRemoteResponse(

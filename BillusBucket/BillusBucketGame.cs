@@ -952,10 +952,10 @@ namespace BillusBucket
             }
         }
 
-        private void HandleCopyConnectCode()
+        private async void HandleCopyConnectCode()
         {
             string code = leaderboardService?.PlayerConnectCode ?? string.Empty;
-            bool copied = platformBridge.TryCopyTextToClipboard(code);
+            bool copied = await platformBridge.CopyTextToClipboardAsync(code);
             syncStatusMessage = copied ? "CODE COPIED TO CLIPBOARD!" : "WRITE DOWN SAVE CODE ABOVE";
             audio?.Play(GameAudio.SoundToggle);
 
@@ -2177,7 +2177,7 @@ namespace BillusBucket
             DrawEditorStatusLine("2-12 LETTERS OR NUMBERS");
 
             DrawOnScreenKeypad(allowPunctuation: true);
-            DrawCenteredText("SAVED ON DEVICE + CLOUD", y: 131f, HudLabelColor, scale: 1);
+            DrawCenteredText("SAVE YOUR NAME TO CONNECT", y: 131f, HudLabelColor, scale: 1);
 
             string cancelLabel = (openedFromPostRunAutoPrompt && !hasCustom) ? "LATER" : "CANCEL";
             DrawButton(cancelLabel, NameCancelButton, isModalCancelHovered);
