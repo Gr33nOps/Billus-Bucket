@@ -141,26 +141,27 @@ local function sideWalk(step,left)
  rect(a,13,8,4,1,'skinshade')
  rect(a,13,9,4,2,'white');rect(a,15,9,2,2,'ink')
  px(a,9,11,'skinshade');rect(a,14,13,3,1,'ink');px(a,15,13,'white')
- -- Turn the body, then author lighting and scarf on the visible shoulder.
+ -- Scarf belongs to the torso: turn its neck band, tail and outline together.
+ line(a,9,16,17,16,'ink');line(a,10,17,16,17,'gold')
+ line(a,9,18,14,18,'ink')
+ rect(a,15,17,4,6,'ink');rect(a,16,18,2,4,'goldshade')
+ line(a,16,18,16,20,'gold')
+ -- Close the scarf silhouette before turning, including the shirt edge behind it.
+ rect(a,18,18,1,5,'ink')
  if left then
   local turned=img(24,32)
   for y=0,31 do for x=0,23 do turned:drawPixel(23-x,y,a:getPixel(x,y)) end end
   a=turned
  end
- -- The scarf hangs on the same visible side, rather than teleporting at turns.
- line(a,9,16,17,16,'ink');line(a,10,17,16,17,'gold')
- line(a,9,18,14,18,'ink')
- rect(a,15,17,4,6,'ink');rect(a,16,18,2,4,'goldshade')
- line(a,16,18,16,20,'gold')
  -- Keep highlights on the world-facing upper-left surfaces.
  for y=18,22 do
   for x=7,17 do
    if a:getPixel(x,y)==col('teallight') then px(a,x,y,'teal') end
   end
  end
- line(a,10,19,10,21,'teallight')
- -- The scarf edge is the silhouette here; remove the shirt strip behind it.
- rect(a,18,18,1,5,'ink')
+ for y=19,21 do
+  if a:getPixel(10,y)==col('teal') then px(a,10,y,'teallight') end
+ end
  return outlineBillu(simplifyBillu(a))
 end
 local function billu(side,step,burn)

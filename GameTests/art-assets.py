@@ -14,3 +14,12 @@ for start in [4,8]:assert len({f.tobytes() for f in frames[start:start+4]})==4
 assert frames[4].transpose(Image.Transpose.FLIP_LEFT_RIGHT).tobytes()!=frames[8].tobytes()
 icon=Image.open(root/'favicon.png').convert('RGBA');assert icon.crop((2,8,30,24)).tobytes()==bucket.tobytes()
 print('All PNGs have binary alpha and editable sources; 12 character frames, unique gaits, fixed bucket/ground alignment, exact favicon verified.')
+
+# Scarf and its outline must turn with the torso, not stay screen-right.
+gold={(227,182,98,255),(184,119,50,255)}
+for step in range(4):
+ right,left=frames[4+step],frames[8+step]
+ r={(x,y) for y in range(28,35) for x in range(32) if right.getpixel((x,y)) in gold}
+ l={(x,y) for y in range(28,35) for x in range(32) if left.getpixel((x,y)) in gold}
+ assert r and {(31-x,y) for x,y in r}==l,('scarf did not turn with torso',step)
+print('Directional scarf placement passed.')

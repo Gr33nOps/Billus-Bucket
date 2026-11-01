@@ -5,7 +5,7 @@ Reviewed every shipped PNG atlas at native and enlarged nearest-neighbour sizes:
 ## Changes
 
 - Authored separate left/right walking frames with a single readable profile eye and nose. Rendering selects the directional frames instead of flipping the entire character and bucket.
-- Kept the scarf on its established visible side across turns. Preserved full sleeves, full trousers and matching shoes.
+- The scarf neck band, hanging tail and outline turn with the torso in both walking directions. Preserved full sleeves, full trousers and matching shoes.
 - Restored restrained hair, shirt and trouser shade clusters in both normal and burned states. Kept the dark plum outline shared by foreground props.
 - Added broad metal highlights/shadow to the bucket. It stays fixed across directions and the favicon uses the same exact bucket pixels.
 - Made shared button corner steps symmetric, removing the chipped-looking right edge on main and leaderboard controls. Kept the clean faces without decorative dots.
