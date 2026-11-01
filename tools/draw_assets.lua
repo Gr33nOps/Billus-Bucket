@@ -49,6 +49,9 @@ local bucket=img(28,16)
 poly(bucket,{{3,4},{24,4},{22,13},{20,15},{7,15},{5,13}},'ink')
 poly(bucket,{{4,5},{23,5},{21,13},{19,14},{8,14},{6,12}},'blueshade')
 poly(bucket,{{5,5},{22,5},{20,12},{19,13},{8,13},{6,11}},'blue')
+-- Broad metal shading: the light stays upper-left in every facing.
+line(bucket,6,7,7,10,'bluelight');line(bucket,7,11,9,12,'bluelight')
+line(bucket,21,7,20,11,'blueshade')
 -- An open oval mouth, with a bright front lip distinct from the body.
 oval(bucket,0,0,28,7,'ink');oval(bucket,2,1,24,5,'bluelight')
 oval(bucket,4,2,20,3,'ink')
@@ -78,8 +81,7 @@ saveFrames('bucket-burned',{wreck},28,16)
 -- Character: 24x32. Body, arms, and expression are authored at native size.
 local function simplifyBillu(a)
  -- Larger flat color groups match the props; keep expressive eyes and silhouette.
- local merge={{'skinlight','skin'},{'hairlight','hair'},{'pantslight','pants'},
-              {'teallight','teal'},{'goldlight','gold'}}
+ local merge={{'skinlight','skin'},{'goldlight','gold'}}
  for y=0,a.height-1 do for x=0,a.width-1 do
   local c=a:getPixel(x,y)
   for _,pair in ipairs(merge) do if c==col(pair[1]) then px(a,x,y,pair[2]);break end end
@@ -103,7 +105,7 @@ local function outlineBillu(a)
  for _,point in ipairs(edges) do px(a,point[1],point[2],'ink') end
  return a
 end
-local function sideWalk(step)
+local function sideWalk(step,left)
  local a=img(24,32)
  -- Profile gait: far leg first, near leg in front, alternating contacts.
  local poses={{7,17,30,30},{10,14,29,30},{17,7,30,30},{14,11,30,29}}
@@ -131,25 +133,34 @@ local function sideWalk(step)
  poly(a,{{20,4},{21,4},{21,6},{19,9},{16,14},{15,14},{17,9},{20,5}},'teal')
  line(a,20,7,18,10,'tealshade')
  rect(a,20,1,2,3,'skin');px(a,20,4,'ink');px(a,21,4,'ink')
- -- Wider readable three-quarter face, with a small far eye and clear nose.
- poly(a,{{6,5},{8,3},{14,2},{18,4},{18,9},{19,10},{19,12},{18,12},{17,15},{10,16},{6,12},{5,8}},'ink')
- poly(a,{{8,6},{17,6},{17,10},{18,10},{18,11},{17,11},{17,14},{11,15},{8,12}},'skin')
- rect(a,10,7,7,6,'skinlight');rect(a,7,9,3,3,'skin');px(a,8,10,'skinshade')
- poly(a,{{6,5},{8,3},{13,3},{17,4},{18,6},{15,6},{14,7},{12,6},{10,7},{9,9},{7,9},{7,12},{5,9}},'hair')
- line(a,8,4,12,3,'hairlight');px(a,15,4,'hairlight')
- rect(a,11,8,3,1,'skinshade');rect(a,16,8,2,1,'skinshade')
- rect(a,10,9,4,2,'white');rect(a,12,9,2,2,'ink')
- rect(a,16,9,2,2,'white');px(a,17,9,'ink');px(a,17,10,'ink')
- px(a,15,11,'skinshade');rect(a,12,13,5,1,'ink');rect(a,13,13,3,1,'white')
- -- Keep the near cheek contour in front of the raised sleeve.
- -- The nose is one pixel wide so it cannot run into the forearm.
- line(a,18,6,18,9,'ink');line(a,19,10,19,12,'ink');px(a,18,12,'ink')
+ -- A readable profile: one eye, a forward nose, and hair behind the ear.
+ poly(a,{{6,5},{8,3},{14,2},{17,4},{18,7},{18,9},{20,10},{20,12},{18,12},{18,14},{15,16},{10,16},{6,12},{5,8}},'ink')
+ poly(a,{{9,6},{16,6},{17,8},{17,10},{19,10},{19,11},{17,11},{17,14},{14,15},{10,14},{8,11}},'skin')
+ poly(a,{{6,5},{8,3},{13,3},{16,4},{17,6},{14,6},{12,7},{10,7},{9,10},{7,10},{7,12},{5,9}},'hair')
+ line(a,8,4,12,3,'hairlight')
+ rect(a,13,8,4,1,'skinshade')
+ rect(a,13,9,4,2,'white');rect(a,15,9,2,2,'ink')
+ px(a,9,11,'skinshade');rect(a,14,13,3,1,'ink');px(a,15,13,'white')
+ -- Turn the body, then author lighting and scarf on the visible shoulder.
+ if left then
+  local turned=img(24,32)
+  for y=0,31 do for x=0,23 do turned:drawPixel(23-x,y,a:getPixel(x,y)) end end
+  a=turned
+ end
+ -- The scarf hangs on the same visible side, rather than teleporting at turns.
  line(a,9,16,17,16,'ink');line(a,10,17,16,17,'gold')
- line(a,13,18,17,18,'ink');px(a,17,17,'ink')
- rect(a,9,17,4,6,'ink');rect(a,10,18,2,4,'goldshade')
- line(a,10,18,10,20,'gold')
+ line(a,9,18,14,18,'ink')
+ rect(a,15,17,4,6,'ink');rect(a,16,18,2,4,'goldshade')
+ line(a,16,18,16,20,'gold')
+ -- Keep highlights on the world-facing upper-left surfaces.
+ for y=18,22 do
+  for x=7,17 do
+   if a:getPixel(x,y)==col('teallight') then px(a,x,y,'teal') end
+  end
+ end
+ line(a,10,19,10,21,'teallight')
  -- The scarf edge is the silhouette here; remove the shirt strip behind it.
- rect(a,7,18,2,5,nil)
+ rect(a,18,18,1,5,'ink')
  return outlineBillu(simplifyBillu(a))
 end
 local function billu(side,step,burn)
@@ -231,8 +242,14 @@ local function billu(side,step,burn)
  line(a,16,18,16,20,'gold');px(a,17,18,'goldlight')
  return outlineBillu(simplifyBillu(a))
 end
-local carry={};for row=0,1 do for f=0,3 do local a=img(32,48);paste(a,bucket,2,0);paste(a,billu(row==1,f,false),4,12);carry[#carry+1]=a end end
-saveFrames('billu-carry',carry,32,48,{{'straight',1,4},{'walk',5,8}})
+local carry={}
+for row=0,2 do for f=0,3 do
+ local a=img(32,48)
+ local body=row==0 and billu(false,f,false) or sideWalk(f,row==2)
+ paste(a,body,4,12);paste(a,bucket,2,0)
+ carry[#carry+1]=a
+end end
+saveFrames('billu-carry',carry,32,48,{{'straight',1,4},{'walk-right',5,8},{'walk-left',9,12}})
 local burned=billu(false,0,true);local blink=burned:clone();rect(blink,7,9,4,2,'soot');rect(blink,13,9,4,2,'soot');rect(blink,7,10,4,1,'ash');rect(blink,13,10,4,1,'ash')
 saveFrames('billu-burned',{burned,blink},24,32,{{'cry',1,2}})
 saveFrames('billu-body',{billu(false,0,false)},24,32)
@@ -467,7 +484,7 @@ local layers={{'Sky',sky},{'Distant town',far},{'Windows and wires',city},{'Roof
 local combined=img(320,180)
 for i,t in ipairs(layers) do local layer=i==1 and scene.layers[1] or scene:newLayer();layer.name=t[1];scene:newCel(layer,1,t[2],Point(0,0));paste(combined,t[2],0,0) end
 scene:saveAs(root..'/Sources/rooftop.aseprite');combined:saveAs(root..'/rooftop.png');scene:close()
--- Rooftop UI: weathered painted timber, hanging cord, brass fasteners.
+-- Rooftop UI: muted painted timber and clean, unadorned bevels.
 local sign=img(144,78)
 
 local signEdge={{3,13},{138,13},{143,18},{141,66},{136,70},{7,70},{1,66},{0,18}}
@@ -482,9 +499,9 @@ contour(sign,signEdge,'ink')
 saveFrames('ui-sign',{sign},144,78)
 local buttons={}
 for f=0,1 do local b=img(68,18)
-local buttonEdge={{3,0},{64,0},{67,3},{66,14},{62,17},{4,17},{0,13},{0,4}}
+local buttonEdge={{3,0},{64,0},{67,3},{67,14},{64,17},{3,17},{0,14},{0,3}}
 poly(b,buttonEdge,0x294957);contour(b,buttonEdge,'ink')
-poly(b,{{4,1},{63,1},{66,4},{65,13},{62,15},{4,15},{2,12},{2,4}},f==0 and 0x396e78 or 0x4d8b91)
+poly(b,{{4,1},{63,1},{66,4},{66,13},{63,16},{4,16},{1,13},{1,4}},f==0 and 0x396e78 or 0x4d8b91)
 line(b,5,2,61,2,f==0 and 0x73a6a2 or 0xa2c8b6);line(b,5,14,61,14,0x294957)
 -- Keep the button face free of decorative dots.
 contour(b,buttonEdge,'ink')

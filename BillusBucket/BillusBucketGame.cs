@@ -1847,10 +1847,7 @@ namespace BillusBucket
             Vector2 characterRoot = new Vector2((int)bucket.X, PixelArt.GroundTop);
             if (CurrentPhase != RoundPhase.GameOver)
             {
-                int frame = billu.Action == BilluAction.Straight ? 0 : 4 + billu.Frame;
-                SpriteEffects facing = billu.Action == BilluAction.WalkLeft
-                    ? SpriteEffects.FlipHorizontally
-                    : SpriteEffects.None;
+                int frame = billu.SpriteFrame;
 
                 batch.Draw(
                     billuSheet,
@@ -1860,7 +1857,7 @@ namespace BillusBucket
                     0f,
                     new Vector2(16f, 44f),
                     1f,
-                    facing,
+                    SpriteEffects.None,
                     0f);
             }
             else

@@ -322,8 +322,10 @@ namespace GameTests
             Equal(BilluAction.Straight, billu.Action, "Billu faces forward while still");
             billu.Update(0.15f, 3f);
             Equal(BilluAction.WalkRight, billu.Action, "slow movement still uses the right walking pose");
+            Equal(4 + billu.Frame, billu.SpriteFrame, "right uses authored right frames");
             billu.Update(0.15f, -3f);
             Equal(BilluAction.WalkLeft, billu.Action, "slow movement still uses the left walking pose");
+            Equal(8 + billu.Frame, billu.SpriteFrame, "left uses authored left frames without flipping light or scarf");
             billu.Reset();
             Equal(0, billu.Frame, "straight pose stays on one frame");
 

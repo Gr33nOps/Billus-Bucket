@@ -23,6 +23,9 @@ namespace BillusBucket
 
         public BilluAction Action { get; private set; } = BilluAction.Straight;
 
+        public int SpriteFrame => Action == BilluAction.WalkLeft ? 8 + Frame
+            : Action == BilluAction.WalkRight ? 4 + Frame : 0;
+
         public int Frame
         {
             get
