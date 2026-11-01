@@ -320,7 +320,13 @@ namespace BillusBucket
             {
                 try
                 {
+                    if (AudioPreferences.TryParse(platformBridge.LoadAudioPreferences(), out var preferences))
+                    {
+                        musicMuted = preferences.MusicMuted;
+                        sfxMuted = preferences.SfxMuted;
+                    }
                     audio = new GameAudio(assetProvider);
+                    audio.SetMuted(musicMuted, sfxMuted, playFeedback:false);
                 }
                 catch (NoAudioHardwareException error)
                 {
@@ -465,7 +471,7 @@ namespace BillusBucket
                 else if (MusicButton.Contains(tapPoint.X, tapPoint.Y))
                 {
                     musicMuted = !musicMuted;
-                    audio?.SetMuted(musicMuted, sfxMuted);
+                    ApplyAudioPreferences();
                     ignorePointerUntilRelease = true;
                     clicked = false;
                     tapped = false;
@@ -473,7 +479,7 @@ namespace BillusBucket
                 else if (SfxButton.Contains(tapPoint.X, tapPoint.Y))
                 {
                     sfxMuted = !sfxMuted;
-                    audio?.SetMuted(musicMuted, sfxMuted);
+                    ApplyAudioPreferences();
                     ignorePointerUntilRelease = true;
                     clicked = false;
                     tapped = false;
@@ -487,7 +493,7 @@ namespace BillusBucket
                 bool shouldMuteBoth = !bothCurrentlyMuted;
                 musicMuted = shouldMuteBoth;
                 sfxMuted = shouldMuteBoth;
-                audio?.SetMuted(musicMuted, sfxMuted);
+                ApplyAudioPreferences();
             }
 
             RoundPhase phaseBefore = CurrentPhase;
@@ -584,6 +590,20 @@ namespace BillusBucket
             audio?.Update(dt, CurrentPhase, IsActive, platformBridge.IsExternalAudioMuted);
             SaveInputState(keys, mouse, touchDown);
             base.Update(gameTime);
+        }
+
+        public void SuspendForBrowser()
+        {
+            flow.OnFocusLost();
+            leaderboardService?.FlushLocalState();
+            platformBridge.NotifyGameplayStop();
+            audio?.Update(0f, CurrentPhase, isWindowActive:false, isExternallyMuted:true);
+        }
+
+        private void ApplyAudioPreferences()
+        {
+            audio?.SetMuted(musicMuted, sfxMuted);
+            platformBridge.SaveAudioPreferences(new AudioPreferences(musicMuted, sfxMuted).Serialize());
         }
 
         private void SyncPlatformGameplayLifecycle()
@@ -1333,6 +1353,8 @@ namespace BillusBucket
             billu.Reset();
         }
 
+        private readonly List<(Drop Drop, float Time)> frameCatches = new List<(Drop, float)>();
+
         private void UpdateRun(
             float dt,
             KeyboardState keys,
@@ -1352,6 +1374,7 @@ namespace BillusBucket
 
             float? pointerTargetX = GetActivePointerTargetX(mouse, touch, canvasViewport);
 
+            float previousBucketX = bucket.X;
             bucket.Update(dt, keyboardDirection, pointerTargetX);
             billu.Update(dt, bucket.VelocityX);
 
@@ -1362,44 +1385,33 @@ namespace BillusBucket
                 SpawnDrop();
             }
 
-            Rectangle bucketRimBox = new Rectangle(
-                (int)bucket.X - CatchBoxHalfWidth,
-                PixelArt.GroundTop - CatchBoxOffsetFromGround,
-                CatchBoxWidth,
-                CatchBoxHeight);
-
+            float rimCenterY = PixelArt.GroundTop - CatchBoxOffsetFromGround + CatchBoxHeight * 0.5f;
+            frameCatches.Clear();
             for (int i = drops.Count - 1; i >= 0; i--)
             {
                 Drop drop = drops[i];
+                float oldX = drop.Motion.X, oldY = drop.Motion.Y;
                 drop.Motion.Update(dt);
-
                 bool isCash = drop.Motion.Kind == DropKind.Cash;
-                int halfWidth = isCash ? CashHitboxHalfWidth : BombHitboxHalfWidth;
-                int halfHeight = isCash ? CashHitboxHalfHeight : BombHitboxHalfHeight;
-
-                Rectangle dropBox = new Rectangle(
-                    (int)drop.Motion.X - halfWidth,
-                    (int)drop.Motion.Y - halfHeight,
-                    halfWidth * 2,
-                    halfHeight * 2);
-
-                if (dropBox.Intersects(bucketRimBox))
-                {
-                    drops.RemoveAt(i);
-                    if (isCash)
-                    {
-                        HandleCashCaught(drop);
-                    }
-                    else
-                    {
-                        HandleBombHit();
-                        break;
-                    }
-                }
+                float halfWidth = CatchBoxHalfWidth + (isCash ? CashHitboxHalfWidth : BombHitboxHalfWidth);
+                float halfHeight = CatchBoxHeight * 0.5f + (isCash ? CashHitboxHalfHeight : BombHitboxHalfHeight);
+                if (DropCollision.TryFindCatch(oldX, oldY, drop.Motion.X, drop.Motion.Y,
+                    previousBucketX, bucket.X, rimCenterY, halfWidth, halfHeight, out float hitTime))
+                    frameCatches.Add((drop, hitTime));
                 else if (drop.Motion.Y > PixelArt.Height + DropDespawnMargin)
-                {
                     drops.RemoveAt(i);
-                }
+            }
+
+            // Resolve real contact order, independent of insertion order or frame rate.
+            frameCatches.Sort((first, second) => {
+                int byTime = first.Time.CompareTo(second.Time);
+                return byTime != 0 ? byTime : second.Drop.Motion.Kind.CompareTo(first.Drop.Motion.Kind);
+            });
+            foreach (var caught in frameCatches)
+            {
+                drops.Remove(caught.Drop);
+                if (caught.Drop.Motion.Kind == DropKind.Cash) HandleCashCaught(caught.Drop);
+                else { HandleBombHit(); break; }
             }
         }
 

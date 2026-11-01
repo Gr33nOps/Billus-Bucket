@@ -30,9 +30,8 @@
     </div>
 
     <div id="blazor-error-ui">
-        GAME ERROR OCCURRED.
+        <span id="game-error-message">GAME ERROR OCCURRED.</span>
         <a href="" class="reload" style="color:#f0d398;margin-left:8px;">RELOAD</a>
-        <a class="dismiss">X</a>
     </div>
 
     <script src="platform-config.js?v=__BILLU_ASSET_VERSION__"></script>
@@ -50,7 +49,7 @@
     <script src="_content/nkast.Wasm.Audio/js/Audio.10.0.3.js"></script>
     <script src="_content/nkast.Wasm.XR/js/XR.10.0.3.js"></script>
 
-    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
 </body>
 
 </html>

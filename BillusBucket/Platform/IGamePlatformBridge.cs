@@ -1,8 +1,25 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace BillusBucket
 {
+    public readonly struct AudioPreferences
+    {
+        public bool MusicMuted { get; }
+        public bool SfxMuted { get; }
+        public AudioPreferences(bool musicMuted, bool sfxMuted) { MusicMuted = musicMuted; SfxMuted = sfxMuted; }
+        public string Serialize() => (MusicMuted ? "1" : "0") + (SfxMuted ? "1" : "0");
+        public static bool TryParse(string value, out AudioPreferences preferences)
+        {
+            preferences = default;
+            if (value == null || value.Length != 2 || (value[0] != '0' && value[0] != '1') || (value[1] != '0' && value[1] != '1'))
+                return false;
+            preferences = new AudioPreferences(value[0] == '1', value[1] == '1');
+            return true;
+        }
+    }
+
     public sealed class GameViewportBounds
     {
         public int X { get; set; }
@@ -40,6 +57,8 @@ namespace BillusBucket
         bool IsExternalAudioMuted { get; }
         GameViewportBounds ViewportBounds => null;
 
+        string LoadAudioPreferences() => null;
+        void SaveAudioPreferences(string value) { }
         Task InitializeAsync();
         void NotifyLoadingStarted();
         void NotifyLoadingFinished();
@@ -56,16 +75,36 @@ namespace BillusBucket
     }
 
     /// <summary>
-    /// Default no-op platform bridge used on desktop and standalone builds.
+    /// Standalone desktop bridge: local audio preferences and no portal notifications.
     /// </summary>
     public sealed class NullPlatformBridge : IGamePlatformBridge
     {
         public string PlatformId { get; }
         public bool IsExternalAudioMuted => false;
 
-        public NullPlatformBridge(string platformId = "desktop")
+        private readonly string preferencesPath;
+        public NullPlatformBridge(string platformId = "desktop", string preferencesPath = null)
         {
             PlatformId = string.IsNullOrWhiteSpace(platformId) ? "desktop" : platformId;
+            this.preferencesPath = preferencesPath ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BillusBucket", "audio.txt");
+        }
+
+        public string LoadAudioPreferences()
+        {
+            try { return File.Exists(preferencesPath) ? File.ReadAllText(preferencesPath) : null; }
+            catch { return null; }
+        }
+        public void SaveAudioPreferences(string value)
+        {
+            if (!AudioPreferences.TryParse(value, out _)) return;
+            try
+            {
+                string directory = Path.GetDirectoryName(preferencesPath);
+                if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+                File.WriteAllText(preferencesPath, value);
+            }
+            catch { }
         }
 
         public Task InitializeAsync() => Task.CompletedTask;
@@ -98,6 +137,9 @@ namespace BillusBucket
         {
             this.inner = inner ?? throw new ArgumentNullException(nameof(inner));
         }
+
+        public string LoadAudioPreferences() => inner.LoadAudioPreferences();
+        public void SaveAudioPreferences(string value) => inner.SaveAudioPreferences(value);
 
         public Task InitializeAsync()
         {

@@ -131,13 +131,14 @@ html, body {
 #blazor-error-ui {
     background: #514352;
     color: #f1e3bf;
-    bottom: 0;
+    top: var(--visible-y, 0px);
+    box-sizing: border-box;
     box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.4);
     display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem;
+    left: var(--visible-x, 0px);
+    padding: max(0.6rem, env(safe-area-inset-top, 0px)) 1.25rem;
     position: fixed;
-    width: 100%;
+    width: var(--visible-width, 100%);
     z-index: 1000;
     font-family: monospace;
 }

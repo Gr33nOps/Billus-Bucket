@@ -2,6 +2,10 @@
     "use strict";
 
     const memoryStorage = new Map();
+    const pendingStorageKeys = new Set();
+    let windowUnfocused = false;
+    let interruptionPending = false;
+    let interruptedThisFrame = false;
     let dotNetInstance = null;
     let renderLoopRunning = false;
     let externalAudioMuted = false;
@@ -51,6 +55,7 @@
             return null;
         }
 
+        if (pendingStorageKeys.has(key)) return memoryStorage.get(key);
         if (!isRestrictedStorageSimulated()) {
             try {
                 if (window.localStorage) {
@@ -75,6 +80,7 @@
 
         const stringValue = String(value ?? "");
         memoryStorage.set(key, stringValue);
+        pendingStorageKeys.add(key);
 
         if (isRestrictedStorageSimulated()) {
             return false;
@@ -85,6 +91,7 @@
                 return false;
             }
             window.localStorage.setItem(key, stringValue);
+            pendingStorageKeys.delete(key);
             return true;
         } catch (_err) {
             return false;
@@ -436,13 +443,56 @@
         canvas.style.height = viewH + "px";
     }
 
+    async function fetchBootResource(uri, integrity) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            try {
+                const response = await fetch(uri, {integrity: integrity || "", cache: "no-cache", signal: controller.signal});
+                if (response.ok) return response;
+                if (response.status !== 429 && response.status < 500) {
+                    throw Object.assign(new Error("Game file unavailable: HTTP " + response.status), {permanent:true});
+                }
+                if (attempt === 2) throw new Error("Game download failed: HTTP " + response.status);
+            } catch (error) {
+                if (error.permanent || attempt === 2) throw error;
+            } finally { clearTimeout(timeout); }
+            await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+        }
+    }
+
+    async function startBrowserGame() {
+        try {
+            await window.Blazor.start({loadBootResource: function (type, name, uri, integrity) {
+                // JavaScript runtime modules use Blazor's default module loader.
+                return type === "dotnetjs" ? null : fetchBootResource(uri, integrity).catch(error => {
+                    // Some runtime versions log resource failures without rejecting start().
+                    showFatalError(error);
+                    throw error;
+                });
+            }});
+        } catch (error) { showFatalError(error); }
+    }
+
+    function suspendBrowserGame() {
+        interruptionPending = true;
+        try { dotNetInstance?.invokeMethod("SuspendBrowserGame"); }
+        catch (_err) { /* A closing/disposed page must not block navigation. */ }
+    }
+
     function showFatalError(error) {
+        suspendBrowserGame();
         renderLoopRunning = false;
         dotNetInstance = null;
         externalAudioMuted = true;
         console.error("Game stopped:", error);
         const overlay = document.getElementById("loadingOverlay");
+        const loading = overlay && overlay.style.display !== "none";
         if (overlay) overlay.style.display = "none";
+        const description = document.getElementById("game-error-message");
+        if (description) description.textContent = loading
+            ? "COULD NOT LOAD GAME. CHECK CONNECTION AND RELOAD."
+            : "GAME STOPPED. PLEASE RELOAD.";
         const message = document.getElementById("blazor-error-ui");
         if (message) message.style.display = "block";
     }
@@ -455,7 +505,10 @@
                 syncResponsiveCanvasLayout();
                 lastViewportCheck = Date.now();
             }
+            interruptedThisFrame = interruptionPending;
+            interruptionPending = false;
             if (dotNetInstance) dotNetInstance.invokeMethod("TickDotNet");
+            interruptedThisFrame = false;
         } catch (error) {
             showFatalError(error);
             return;
@@ -481,7 +534,7 @@
     }
 
     function isExternalAudioMuted() {
-        return externalAudioMuted || document.hidden === true ||
+        return externalAudioMuted || windowUnfocused || interruptedThisFrame || interruptionPending || document.hidden === true ||
             Boolean(window.matchMedia?.("(orientation: portrait) and (pointer: coarse)").matches);
     }
 
@@ -489,14 +542,22 @@
         return document.querySelector('meta[name="billu-build"]')?.content || "dev";
     }
 
+    // Keep startup in this external script so portal CSPs do not need inline handlers.
+    window.addEventListener("load", startBrowserGame, {once:true});
     window.addEventListener("resize", syncResponsiveCanvasLayout);
     window.addEventListener("orientationchange", syncResponsiveCanvasLayout);
     window.visualViewport?.addEventListener("resize", syncResponsiveCanvasLayout);
     window.visualViewport?.addEventListener("scroll", syncResponsiveCanvasLayout);
 
     document.addEventListener("visibilitychange", function () {
-        externalAudioMuted = document.hidden === true;
+        if (document.hidden === true) suspendBrowserGame();
     });
+    window.addEventListener("blur", function () {
+        windowUnfocused = true;
+        suspendBrowserGame();
+    });
+    window.addEventListener("focus", function () { windowUnfocused = false; });
+    window.addEventListener("pagehide", suspendBrowserGame);
 
     window.addEventListener("keydown", function (event) {
         const blockedCodes = ["Space", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
@@ -511,6 +572,7 @@
 
     window.billuPlatform = {
         initializePlatform: initializePlatform,
+        startBrowserGame: startBrowserGame,
         notifyLoadingStarted: notifyLoadingStarted,
         notifyLoadingFinished: notifyLoadingFinished,
         notifyGameplayStart: notifyGameplayStart,

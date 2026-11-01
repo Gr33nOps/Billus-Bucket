@@ -42,6 +42,7 @@ namespace BillusBucket
         };
 
         private readonly Dictionary<string, SoundEffect> effects = new Dictionary<string, SoundEffect>();
+        private readonly List<SoundEffectInstance> voices = new List<SoundEffectInstance>();
         private SoundEffectInstance music;
         private float currentMusicVolume;
         private float sadDelay = -1f;
@@ -58,14 +59,25 @@ namespace BillusBucket
             {
                 foreach (string name in AllSoundNames)
                 {
-                    using Stream stream = provider.OpenRead("Audio/" + name + ".wav");
-                    effects[name] = SoundEffect.FromStream(stream);
+                    try
+                    {
+                        using Stream stream = provider.OpenRead("Audio/" + name + ".wav");
+                        effects[name] = SoundEffect.FromStream(stream);
+                    }
+                    catch (NoAudioHardwareException) { throw; }
+                    catch (Exception error)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Optional sound unavailable: " + name + " " + error.Message);
+                    }
                 }
 
-                music = effects[MusicLoopName].CreateInstance();
-                music.IsLooped = true;
-                music.Volume = 0f;
-                TryEnsureMusicPlaying();
+                if (effects.TryGetValue(MusicLoopName, out SoundEffect loop))
+                {
+                    music = loop.CreateInstance();
+                    music.IsLooped = true;
+                    music.Volume = 0f;
+                    TryEnsureMusicPlaying();
+                }
             }
             catch
             {
@@ -84,14 +96,15 @@ namespace BillusBucket
             TryEnsureMusicPlaying();
         }
 
-        public void SetMuted(bool musicMuted, bool sfxMuted)
+        public void SetMuted(bool musicMuted, bool sfxMuted, bool playFeedback = true)
         {
             bool changed = MusicMuted != musicMuted || SfxMuted != sfxMuted;
             bool wasSfxMuted = SfxMuted;
-            if (changed && !wasSfxMuted) Play(SoundToggle);
+            if (sfxMuted && !wasSfxMuted) StopVoices();
+            if (playFeedback && changed && !wasSfxMuted) Play(SoundToggle);
             MusicMuted = musicMuted;
             SfxMuted = sfxMuted;
-            if (changed && wasSfxMuted && !SfxMuted) Play(SoundToggle);
+            if (playFeedback && changed && wasSfxMuted && !SfxMuted) Play(SoundToggle);
 
             if (musicMuted && music != null && !isDisposed)
             {
@@ -125,12 +138,19 @@ namespace BillusBucket
                 _ => DefaultSfxVolume
             };
             float clampedPitch = Math.Clamp(pitch, -1f, 1f);
+            SoundEffectInstance voice = null;
             try
             {
-                effect.Play(volume, clampedPitch, pan: 0f);
+                voice = effect.CreateInstance();
+                voice.Volume = volume;
+                voice.Pitch = clampedPitch;
+                voice.Pan = 0f;
+                voice.Play();
+                voices.Add(voice);
             }
             catch
             {
+                voice?.Dispose();
                 // Ignore transient browser WebAudio autoplay rejections prior to user gesture.
             }
         }
@@ -168,12 +188,19 @@ namespace BillusBucket
         public void Update(float dt, RoundPhase phase, bool isWindowActive, bool isExternallyMuted = false)
         {
             externallyMuted = isExternallyMuted;
-            if (isDisposed || music == null)
-            {
-                return;
-            }
+            if (isDisposed) return;
 
             bool canPlayAudio = isWindowActive && !isExternallyMuted;
+            if (!canPlayAudio) StopVoices();
+            else
+            {
+                for (int i = voices.Count - 1; i >= 0; i--)
+                {
+                    if (voices[i].State != SoundState.Stopped) continue;
+                    voices[i].Dispose();
+                    voices.RemoveAt(i);
+                }
+            }
 
             // Count down the post-explosion sad sting only while the window is active,
             // matching the visual explosion timer.
@@ -186,6 +213,7 @@ namespace BillusBucket
                 }
             }
 
+            if (music == null) return; // Available SFX still work without the music file.
             float targetVolume = GetTargetMusicVolume(phase, canPlayAudio);
             if (!canPlayAudio)
             {
@@ -244,6 +272,16 @@ namespace BillusBucket
             }
         }
 
+        private void StopVoices()
+        {
+            foreach (SoundEffectInstance voice in voices)
+            {
+                voice.Stop();
+                voice.Dispose();
+            }
+            voices.Clear();
+        }
+
         public void Dispose()
         {
             if (isDisposed)
@@ -252,6 +290,7 @@ namespace BillusBucket
             }
 
             isDisposed = true;
+            StopVoices();
 
             if (music != null)
             {

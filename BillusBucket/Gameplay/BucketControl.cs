@@ -57,7 +57,9 @@ namespace BillusBucket
             }
 
             // Break larger frame times into small 60 FPS steps so movement stays consistent.
-            float remaining = seconds;
+            // Gameplay sends short frames. Bound pathological finite deltas too:
+            // subtracting 1/60 from float.MaxValue never changes it and would hang.
+            float remaining = Math.Min(seconds, 5f);
             while (remaining > 0f)
             {
                 float stepSeconds = Math.Min(remaining, MaxPhysicsStep);

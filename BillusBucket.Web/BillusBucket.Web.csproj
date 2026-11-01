@@ -44,6 +44,8 @@
     <Compile Include="..\BillusBucket\Gameplay\BucketControl.cs" Link="Shared\Gameplay\BucketControl.cs" />
     <Compile Include="..\BillusBucket\Gameplay\Drop.cs" Link="Shared\Gameplay\Drop.cs" />
     <Compile Include="..\BillusBucket\Gameplay\DropDirector.cs" Link="Shared\Gameplay\DropDirector.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\DropCollision.cs" Link="Shared\DropCollision.cs" />
+    <Compile Include="..\BillusBucket\Platform\GameAssetDownload.cs" Link="Shared\GameAssetDownload.cs" />
     <Compile Include="..\BillusBucket\Gameplay\DropMotion.cs" Link="Shared\Gameplay\DropMotion.cs" />
     <Compile Include="..\BillusBucket\Gameplay\NoteCatalog.cs" Link="Shared\Gameplay\NoteCatalog.cs" />
     <Compile Include="..\BillusBucket\Gameplay\RoundFlow.cs" Link="Shared\Gameplay\RoundFlow.cs" />

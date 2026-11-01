@@ -14,6 +14,9 @@ namespace GameTests
     {
         public static void Main()
         {
+            TestAudioPreferences();
+            TestResourceDownloads();
+            TestCatchSweeps();
             TestNoteCatalog();
             TestRunScoring();
             TestCashFormatting();
@@ -46,6 +49,58 @@ namespace GameTests
             {
                 throw new Exception($"{behavior}: expected {expected}, got {actual}");
             }
+        }
+
+        private static void TestAudioPreferences()
+        {
+            Equal(true, AudioPreferences.TryParse("10", out var prefs), "saved audio preferences parse");
+            Equal(true, prefs.MusicMuted && !prefs.SfxMuted, "music and effects retain independent preferences");
+            Equal(false, AudioPreferences.TryParse("invalid", out _), "corrupt preferences fall back safely");
+            string path = Path.Combine(Path.GetTempPath(), "billu-audio-" + Guid.NewGuid().ToString("N") + ".txt");
+            try
+            {
+                var bridge = new PlatformLifecycleGuard(new NullPlatformBridge(preferencesPath:path));
+                bridge.SaveAudioPreferences("10");
+                var reloaded = new NullPlatformBridge(preferencesPath:path);
+                Equal("10", reloaded.LoadAudioPreferences(), "audio settings survive a desktop restart");
+            }
+            finally { File.Delete(path); }
+        }
+
+        private static void TestResourceDownloads()
+        {
+            var handler = new ResponseHandler {Status=HttpStatusCode.ServiceUnavailable, Json="asset"};
+            using var client = new HttpClient(handler);
+            byte[] optional = GameAssetDownload.FetchAsync(client, "https://test.invalid/sound.wav", optional:true,
+                retryDelay:TimeSpan.Zero).GetAwaiter().GetResult();
+            Equal(null, optional, "unavailable optional audio does not stop the game");
+            handler.Status = HttpStatusCode.NotFound;
+            bool threw = false;
+            try { GameAssetDownload.FetchAsync(client, "https://test.invalid/art.png", retryDelay:TimeSpan.Zero).GetAwaiter().GetResult(); }
+            catch (HttpRequestException) { threw = true; }
+            Equal(true, threw, "missing required art fails visibly instead of starting with broken sprites");
+            handler.Status = HttpStatusCode.OK;
+            handler.Statuses.Enqueue(HttpStatusCode.ServiceUnavailable);
+            handler.Statuses.Enqueue(HttpStatusCode.TooManyRequests);
+            int before = handler.RequestCount;
+            byte[] retried = GameAssetDownload.FetchAsync(client, "https://test.invalid/art.png", retryDelay:TimeSpan.Zero).GetAwaiter().GetResult();
+            Equal(3, handler.RequestCount - before, "temporary download failures retry within a bounded attempt count");
+            Equal("asset", System.Text.Encoding.UTF8.GetString(retried), "retry returns the successful asset data");
+
+        }
+
+        private static void TestCatchSweeps()
+        {
+            Equal(true, DropCollision.TryFindCatch(100,110,100,140,100,100,124,18,5,out float time),
+                "fast falling note cannot pass through the bucket between frames");
+            Equal(true, time > 0 && time < 1, "catch reports the time within the frame");
+            Equal(true, DropCollision.TryFindCatch(100,124,100,124,70,130,124,18,5,out _),
+                "moving bucket catches an item crossed during the frame");
+            Equal(false, DropCollision.TryFindCatch(150,110,150,140,100,100,124,18,5,out _),
+                "sweeping does not catch items outside the bucket");
+            DropCollision.TryFindCatch(100,116,100,130,100,100,124,18,5,out float cashTime);
+            DropCollision.TryFindCatch(100,110,100,130,100,100,124,19,8,out float bombTime);
+            Equal(true, cashTime < bombTime, "cash collected before a bomb is scored before game over");
         }
 
         private static void TestNoteCatalog()
@@ -738,6 +793,10 @@ namespace GameTests
             narrowBucket.Update(float.PositiveInfinity, 1, null);
             narrowBucket.Update(float.NaN, 1, float.NaN);
             Equal(true, float.IsFinite(narrowBucket.X), "BucketControl ignores non-finite dt and handles narrow bounds");
+            var delayed = new BucketControl(160,320,28);
+            Equal(true, Task.Run(() => delayed.Update(float.MaxValue, 1, null)).Wait(TimeSpan.FromSeconds(1)),
+                "a very large finite time step cannot hang the movement loop");
+
         }
 
         private static void TestPlayerNameValidationAndCloudProfileSync()
@@ -847,8 +906,13 @@ namespace GameTests
         {
             public HttpStatusCode Status = HttpStatusCode.OK;
             public string Json = "{}";
+            public Queue<HttpStatusCode> Statuses = new Queue<HttpStatusCode>();
+            public int RequestCount;
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-                => Task.FromResult(new HttpResponseMessage(Status) {Content = new StringContent(Json)});
+            {
+                RequestCount++;
+                return Task.FromResult(new HttpResponseMessage(Statuses.Count > 0 ? Statuses.Dequeue() : Status) {Content = new StringContent(Json)});
+            }
         }
 
         private static void TestLeaderboardHttpErrors()

@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.JSInterop;
 
 namespace BillusBucket.Web.Pages
@@ -12,6 +13,8 @@ namespace BillusBucket.Web.Pages
         private ILeaderboardService leaderboardService;
         private DotNetObjectReference<Index> dotNetRef;
         private bool bootCompleted;
+        private bool disposed;
+        private readonly CancellationTokenSource preloadCancellation = new CancellationTokenSource();
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
@@ -50,8 +53,16 @@ namespace BillusBucket.Web.Pages
             catch (Exception error)
             {
                 bootCompleted = false;
+                if (disposed) return;
                 await JsRuntime.InvokeVoidAsync("billuPlatform.showFatalError", error.Message);
             }
+        }
+
+        [JSInvokable]
+        public void SuspendBrowserGame()
+        {
+            game?.SuspendForBrowser();
+            leaderboardService?.FlushLocalState();
         }
 
         [JSInvokable]
@@ -89,15 +100,17 @@ namespace BillusBucket.Web.Pages
                 string revision = assetPaths[i].EndsWith(".png", StringComparison.OrdinalIgnoreCase)
                     ? assetVersion + "-" + imageRevision
                     : assetVersion;
-                downloads[i] = Http.GetByteArrayAsync(
-                    "Assets/" + assetPaths[i] + "?v=" + Uri.EscapeDataString(revision));
+                downloads[i] = GameAssetDownload.FetchAsync(Http,
+                    "Assets/" + assetPaths[i] + "?v=" + Uri.EscapeDataString(revision),
+                    optional: assetPaths[i].EndsWith(".wav", StringComparison.OrdinalIgnoreCase),
+                    cancellationToken: preloadCancellation.Token);
             }
 
             await Task.WhenAll(downloads);
 
             for (int i = 0; i < assetPaths.Length; i++)
             {
-                provider.Add(assetPaths[i], downloads[i].Result);
+                if (downloads[i].Result != null) provider.Add(assetPaths[i], downloads[i].Result);
             }
 
             return provider;
@@ -105,6 +118,9 @@ namespace BillusBucket.Web.Pages
 
         public void Dispose()
         {
+            disposed = true;
+            bootCompleted = false;
+            preloadCancellation.Cancel();
             game?.Dispose();
             dotNetRef?.Dispose();
         }

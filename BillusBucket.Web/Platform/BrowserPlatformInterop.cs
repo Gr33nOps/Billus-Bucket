@@ -98,6 +98,17 @@ namespace BillusBucket.Web
             }
         }
 
+        public string LoadAudioPreferences()
+        {
+            try { return jsInProcess?.Invoke<string>("billuPlatform.storageGet", "billus_bucket.audio_preferences"); }
+            catch { return null; }
+        }
+        public void SaveAudioPreferences(string value)
+        {
+            try { jsInProcess?.Invoke<bool>("billuPlatform.storageSet", "billus_bucket.audio_preferences", value); }
+            catch { }
+        }
+
         public void NotifyLoadingStarted()
         {
             InvokeFireAndForget("billuPlatform.notifyLoadingStarted");

@@ -11,6 +11,8 @@
     <Compile Include="..\BillusBucket\Gameplay\NoteCatalog.cs" Link="NoteCatalog.cs" />
     <Compile Include="..\BillusBucket\Gameplay\DropDirector.cs" Link="DropDirector.cs" />
     <Compile Include="..\BillusBucket\Gameplay\BillusBucketRun.cs" Link="BillusBucketRun.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\DropCollision.cs" Link="Shared\DropCollision.cs" />
+    <Compile Include="..\BillusBucket\Platform\GameAssetDownload.cs" Link="Shared\GameAssetDownload.cs" />
     <Compile Include="..\BillusBucket\Gameplay\DropMotion.cs" Link="DropMotion.cs" />
     <Compile Include="..\BillusBucket\Gameplay\Drop.cs" Link="Drop.cs" />
     <Compile Include="..\BillusBucket\Gameplay\BucketControl.cs" Link="BucketControl.cs" />
