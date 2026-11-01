@@ -907,6 +907,14 @@ namespace BillusBucket
                         audio?.Play(GameAudio.SoundToggle);
                         OpenSyncOverview();
                     }
+                    else if (new Rectangle(61, 134, 198, 11).Contains(pt.X, pt.Y) &&
+                             leaderboardService?.CurrentSnapshot.IsLoading == false)
+                    {
+                        ignorePointerUntilRelease = true;
+                        rankingsToastTimer = 0f;
+                        audio?.Play(GameAudio.SoundToggle);
+                        RefreshLeaderboardInBackground();
+                    }
                     else if (flow.BackButton.Contains(pt.X, pt.Y))
                     {
                         ignorePointerUntilRelease = true;
@@ -1649,7 +1657,11 @@ namespace BillusBucket
 
                 hasAutoPromptedForName = true;
                 hasBackedUpCustomProfileThisSession = true;
-                bestKnownCash = BigInteger.Max(bestKnownCash, result.PersonalBest);
+                bestKnownCash = result.PersonalBest;
+                bool wasGameOver = run.IsOver;
+                run = new BillusBucketRun(bestKnownCash);
+                if (wasGameOver) run.HitBomb();
+                lastRunCash = BigInteger.Zero;
                 leaderboardSubView = LeaderboardSubView.Rankings;
                 rankingsToastMessage = string.IsNullOrWhiteSpace(result.Message)
                     ? "CONNECTED AS " + result.DisplayName
@@ -2076,7 +2088,7 @@ namespace BillusBucket
             BigInteger bestScore = BigInteger.Max(GetCurrentBestScore(), snapshot.PersonalBest);
             string playerName = leaderboardService?.PlayerDisplayName ?? "PLAYER";
 
-            DrawCenteredText("WEEKLY TOP 10", y: 17f, WarmTitleColor, scale: 1);
+            DrawCenteredText(capabilities?.SupportsWeeklyTop10 == true ? "WEEKLY TOP 10" : "PERSONAL BEST", y: 17f, WarmTitleColor, scale: 1);
 
             DrawText("YOU: " + playerName, new Vector2(62f, 28f), BestValueColor, scale: 1);
             if (snapshot.CurrentPlayerWeeklyRank.HasValue)
@@ -2110,7 +2122,7 @@ namespace BillusBucket
                 for (int i = 0; i < rowCount; i++)
                 {
                     LeaderboardRankEntry entry = snapshot.WeeklyTop10[i];
-                    int rowY = 43 + i * 10;
+                    int rowY = 43 + i * 9;
 
                     Color rowColor = entry.IsCurrentPlayer
                         ? BestValueColor
@@ -2120,7 +2132,7 @@ namespace BillusBucket
                                 ? ScoreValueColor
                                 : ButtonTextColor;
 
-                    DrawText(entry.Rank + ".", new Vector2(62f, rowY), rowColor, scale: 1);
+                    DrawText(entry.IsCurrentPlayer ? "YOU" : entry.Rank + ".", new Vector2(62f, rowY), rowColor, scale: 1);
                     DrawText(entry.DisplayName, new Vector2(84f, rowY), rowColor, scale: 1);
 
                     string scoreText = FitCompactRupeeAmount(entry.Score, 84);
@@ -2149,14 +2161,20 @@ namespace BillusBucket
                     secondaryStatus = "ONLINE WEEKLY BOARD INACTIVE";
                 }
 
-                DrawCenteredText(primaryStatus, y: 78f, ButtonTextColor, scale: 1);
+                DrawCenteredText(FitLeaderboardStatus(primaryStatus), y: 78f, ButtonTextColor, scale: 1);
                 DrawCenteredText(secondaryStatus, y: 94f, HudLabelColor, scale: 1);
             }
 
+            string connectionStatus = snapshot.IsLoading ? "CONNECTING..." :
+                capabilities?.SupportsWeeklyTop10 != true ? "SAVED ON THIS DEVICE" :
+                snapshot.IsOnlineAvailable ? "ONLINE - TAP TO REFRESH" :
+                snapshot.StatusMessage.StartsWith("OFFLINE", StringComparison.Ordinal) ? "OFFLINE - CACHED - RETRY" :
+                snapshot.StatusMessage.Contains("TOO MANY") ? "PLEASE WAIT - TAP TO RETRY" : "UNAVAILABLE - TAP TO RETRY";
             if (rankingsToastTimer > 0f && !string.IsNullOrWhiteSpace(rankingsToastMessage))
-            {
-                DrawCenteredText(rankingsToastMessage, y: 139f, ScoreValueColor, scale: 1);
-            }
+                connectionStatus = rankingsToastMessage;
+            DrawRect(61, 134, 198, 1, PanelTimberColor);
+            DrawCenteredText(FitLeaderboardStatus(connectionStatus), y: 137f,
+                snapshot.IsOnlineAvailable ? ScoreValueColor : HudLabelColor, scale: 1);
 
             DrawButton("NAME", LeaderboardNameButton, isLeaderboardNameHovered);
             DrawButton("BACK", flow.BackButton, isBackButtonHovered);
@@ -2203,7 +2221,7 @@ namespace BillusBucket
 
             if (!string.IsNullOrWhiteSpace(syncStatusMessage))
             {
-                DrawCenteredText(syncStatusMessage, y: 80f, WarmTitleColor, scale: 1);
+                DrawCenteredText(FitLeaderboardStatus(syncStatusMessage), y: 80f, WarmTitleColor, scale: 1);
             }
             else if (!hasCustomName)
             {
@@ -2211,7 +2229,8 @@ namespace BillusBucket
             }
             else
             {
-                DrawCenteredText("USE CODE ON PHONE, PC OR WEB", y: 80f, HudLabelColor, scale: 1);
+                DrawCenteredText(hasBackedUpCustomProfileThisSession ? "CLOUD SAVED - KEEP CODE PRIVATE" :
+                    "BACKUP NOT CONFIRMED - RETRY", y: 80f, HudLabelColor, scale: 1);
             }
 
             DrawCenteredText("RESTORES NAME, BEST + RANK", y: 92f, HudLabelColor, scale: 1);
@@ -2241,6 +2260,15 @@ namespace BillusBucket
             DrawButton(isProfileBusy ? "WAIT" : "CONNECT", CodeConnectButton, isModalConfirmHovered);
         }
 
+        private static string FitLeaderboardStatus(string text)
+        {
+            string fitted = text ?? string.Empty;
+            if (PixelFont.Width(fitted, 1) <= 196) return fitted;
+            while (fitted.Length > 0 && PixelFont.Width(fitted + "...", 1) > 196)
+                fitted = fitted.Substring(0, fitted.Length - 1);
+            return fitted + "...";
+        }
+
         private void DrawEditorStatusLine(string defaultHint)
         {
             bool hasStatus = !string.IsNullOrWhiteSpace(editorStatusMessage);
@@ -2248,7 +2276,7 @@ namespace BillusBucket
             Color statusColor = !hasStatus
                 ? HudLabelColor
                 : (editorStatusIsError ? GameOverTitleColor : ScoreValueColor);
-            DrawCenteredText(statusLine, y: 47f, statusColor, scale: 1);
+            DrawCenteredText(FitLeaderboardStatus(statusLine), y: 47f, statusColor, scale: 1);
         }
 
         private void DrawInputBox(Rectangle box, string valueText, bool showCursor)

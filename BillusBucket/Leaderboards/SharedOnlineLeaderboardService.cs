@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace BillusBucket
 {
@@ -21,6 +22,10 @@ namespace BillusBucket
         private readonly Queue<string> submittedRunOrder = new Queue<string>();
 
         private long rankingsRevision;
+        private long identityRevision;
+        private long restoreRevision;
+        private bool pendingProfileSync;
+        private readonly SemaphoreSlim nameSaveGate = new SemaphoreSlim(1, 1);
         private BigInteger personalBest;
         private int? currentWeeklyRank;
         private IReadOnlyList<LeaderboardRankEntry> weeklyTop10 = Array.Empty<LeaderboardRankEntry>();
@@ -151,16 +156,22 @@ namespace BillusBucket
                 sourcePlatform: sourcePlatform,
                 connectCode: SafeGetConnectCode());
 
-            SharedLeaderboardRemoteResponse remote = await transport.SubmitScoreAsync(payload);
+            long submittedIdentity = identityRevision;
+            rankingsRevision++;
+            SharedLeaderboardRemoteResponse remote = await CallTransportAsync(
+                () => transport.SubmitScoreAsync(payload), "OFFLINE - SCORE SAVED LOCALLY");
+            if (submittedIdentity != identityRevision)
+            {
+                return new ScoreSubmissionResult(remote.Success, false, false, personalBest,
+                    currentWeeklyRank, remote.Success, "PREVIOUS PROFILE RUN FINISHED");
+            }
+            rankingsRevision++;
             if (remote.Success)
             {
                 ApplyRemoteProfileSyncIfPresent(remote);
                 isOnlineAvailable = true;
-                currentWeeklyRank = remote.PlayerWeeklyRank ?? currentWeeklyRank;
-                if (remote.Top10.Count > 0)
-                {
-                    weeklyTop10 = remote.Top10;
-                }
+                currentWeeklyRank = remote.PlayerWeeklyRank;
+                weeklyTop10 = remote.Top10;
 
                 string message = weeklyTop10.Count > 0
                     ? "WEEKLY TOP 10"
@@ -185,6 +196,7 @@ namespace BillusBucket
             }
 
             isOnlineAvailable = false;
+            currentWeeklyRank = null;
             string fallbackStatus = string.IsNullOrWhiteSpace(remote.ErrorMessage)
                 ? "OFFLINE - SCORE SAVED LOCALLY"
                 : remote.ErrorMessage;
@@ -209,6 +221,19 @@ namespace BillusBucket
 
         public async Task<ProfileSyncResult> UpdatePlayerNameAsync(string newDisplayName)
         {
+            long requestedIdentity = identityRevision;
+            await nameSaveGate.WaitAsync();
+            try
+            {
+                if (requestedIdentity != identityRevision)
+                    return new ProfileSyncResult(false, false, PlayerDisplayName, personalBest, currentWeeklyRank, "PROFILE CHANGED - TRY AGAIN");
+                return await SavePlayerNameAsync(newDisplayName);
+            }
+            finally { nameSaveGate.Release(); }
+        }
+
+        private async Task<ProfileSyncResult> SavePlayerNameAsync(string newDisplayName)
+        {
             if (!PlayerIdentityValidator.TryValidateCustomName(newDisplayName, out string validName, out string error))
             {
                 return new ProfileSyncResult(
@@ -221,6 +246,28 @@ namespace BillusBucket
             }
 
             rankingsRevision++; // Invalidate refreshes started before this name change.
+            CurrentSnapshot = new LeaderboardSnapshot(personalBest, currentWeeklyRank, weeklyTop10,
+                isLoading: true, isOnlineAvailable: isOnlineAvailable, statusMessage: "SAVING PROFILE...");
+            SharedProfileSavePayload payload = new SharedProfileSavePayload(
+                anonymousPlayerId: SafeGetPlayerId(),
+                connectCode: SafeGetConnectCode(),
+                displayName: validName,
+                personalBest: personalBest,
+                sourcePlatform: sourcePlatform);
+
+            long savedIdentity = identityRevision;
+            SharedLeaderboardRemoteResponse remote = await CallTransportAsync(
+                () => transport.SaveProfileAsync(payload), "OFFLINE - NAME SAVED ON DEVICE");
+            if (savedIdentity != identityRevision)
+                return new ProfileSyncResult(false, false, PlayerDisplayName, personalBest, currentWeeklyRank, "PROFILE CHANGED - TRY AGAIN");
+            if (remote.IsPermanentFailure)
+            {
+                CurrentSnapshot = new LeaderboardSnapshot(personalBest, currentWeeklyRank, weeklyTop10,
+                    isOnlineAvailable: isOnlineAvailable, statusMessage: remote.ErrorMessage);
+                return new ProfileSyncResult(false, false, PlayerDisplayName, personalBest,
+                    currentWeeklyRank, remote.ErrorMessage);
+            }
+
             fallbackSessionName = validName;
             fallbackHasCustomName = true;
             try
@@ -231,20 +278,13 @@ namespace BillusBucket
             {
             }
 
-            SharedProfileSavePayload payload = new SharedProfileSavePayload(
-                anonymousPlayerId: SafeGetPlayerId(),
-                connectCode: SafeGetConnectCode(),
-                displayName: validName,
-                personalBest: personalBest,
-                sourcePlatform: sourcePlatform);
-
-            SharedLeaderboardRemoteResponse remote = await transport.SaveProfileAsync(payload);
+            SetPendingProfileSync(!remote.Success);
             if (remote.Success)
             {
                 rankingsRevision++;
                 ApplyRemoteProfileSyncIfPresent(remote);
                 isOnlineAvailable = true;
-                currentWeeklyRank = remote.PlayerWeeklyRank ?? currentWeeklyRank;
+                currentWeeklyRank = remote.PlayerWeeklyRank;
                 weeklyTop10 = remote.Top10;
 
                 string status = weeklyTop10.Count > 0 ? "WEEKLY TOP 10" : "NO WEEKLY SCORES YET";
@@ -267,13 +307,14 @@ namespace BillusBucket
 
             rankingsRevision++;
             isOnlineAvailable = false;
+            currentWeeklyRank = null;
             CurrentSnapshot = new LeaderboardSnapshot(
                 personalBest: personalBest,
                 currentPlayerWeeklyRank: currentWeeklyRank,
                 weeklyTop10: weeklyTop10,
                 isLoading: false,
                 isOnlineAvailable: false,
-                statusMessage: "OFFLINE - NAME SAVED ON DEVICE");
+                statusMessage: string.IsNullOrWhiteSpace(remote.ErrorMessage) ? "OFFLINE - NAME SAVED ON DEVICE" : remote.ErrorMessage);
 
             return new ProfileSyncResult(
                 accepted: true,
@@ -297,7 +338,12 @@ namespace BillusBucket
                     message: "ENTER 12-CHAR SAVE CODE");
             }
 
-            SharedLeaderboardRemoteResponse remote = await transport.RestoreProfileAsync(formattedCode, sourcePlatform);
+            long requestedRestore = ++restoreRevision;
+            SharedLeaderboardRemoteResponse remote = await CallTransportAsync(
+                () => transport.RestoreProfileAsync(formattedCode, sourcePlatform), "OFFLINE - CHECK INTERNET");
+            if (requestedRestore != restoreRevision)
+                return new ProfileSyncResult(false, false, PlayerDisplayName, personalBest,
+                    currentWeeklyRank, "NEWER CONNECTION REQUEST ACTIVE");
             if (!remote.Success)
             {
                 string err = string.IsNullOrWhiteSpace(remote.ErrorMessage)
@@ -316,9 +362,11 @@ namespace BillusBucket
                 ? remote.ProfileDisplayName
                 : PlayerDisplayName;
             BigInteger restoredBest = remote.ProfilePersonalBest.HasValue
-                ? BigInteger.Max(personalBest, remote.ProfilePersonalBest.Value)
-                : personalBest;
+                ? remote.ProfilePersonalBest.Value
+                : BigInteger.Zero;
 
+            SetPendingProfileSync(false);
+            identityRevision++;
             rankingsRevision++; // The active identity has changed.
             fallbackSessionCode = formattedCode;
             fallbackSessionName = restoredName;
@@ -357,6 +405,11 @@ namespace BillusBucket
 
         public async Task<LeaderboardSnapshot> RefreshRankingsAsync()
         {
+            if (HasPendingProfileSync())
+            {
+                await UpdatePlayerNameAsync(PlayerDisplayName);
+                return CurrentSnapshot;
+            }
             long requestRevision = ++rankingsRevision;
             personalBest = BigInteger.Max(personalBest, SafeLoadPersonalBest());
             CurrentSnapshot = new LeaderboardSnapshot(
@@ -367,9 +420,10 @@ namespace BillusBucket
                 isOnlineAvailable: isOnlineAvailable,
                 statusMessage: "LOADING WEEKLY TOP 10...");
 
-            SharedLeaderboardRemoteResponse remote = await transport.FetchWeeklyTop10Async(
-                SafeGetPlayerId(),
-                sourcePlatform);
+            string requestedPlayerId = SafeGetPlayerId();
+            SharedLeaderboardRemoteResponse remote = await CallTransportAsync(
+                () => transport.FetchWeeklyTop10Async(requestedPlayerId, sourcePlatform),
+                "OFFLINE - LOCAL BEST ACTIVE");
 
             if (requestRevision != rankingsRevision)
             {
@@ -398,6 +452,7 @@ namespace BillusBucket
             else
             {
                 isOnlineAvailable = false;
+                currentWeeklyRank = null;
                 string status = string.IsNullOrWhiteSpace(remote.ErrorMessage)
                     ? "OFFLINE - LOCAL BEST ACTIVE"
                     : remote.ErrorMessage;
@@ -434,7 +489,7 @@ namespace BillusBucket
             }
 
             if (!string.IsNullOrWhiteSpace(remote.ProfileDisplayName) &&
-                !SafeHasCustomName() &&
+                !HasPendingProfileSync() &&
                 !AnonymousPlayerIdentity.IsAutoGeneratedName(remote.ProfileDisplayName))
             {
                 fallbackSessionName = remote.ProfileDisplayName;
@@ -447,6 +502,31 @@ namespace BillusBucket
                 {
                 }
             }
+        }
+
+        private static async Task<SharedLeaderboardRemoteResponse> CallTransportAsync(
+            Func<Task<SharedLeaderboardRemoteResponse>> request, string failureMessage)
+        {
+            try
+            {
+                return await request() ?? new SharedLeaderboardRemoteResponse(false, errorMessage: failureMessage);
+            }
+            catch
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: failureMessage);
+            }
+        }
+
+        private bool HasPendingProfileSync()
+        {
+            try { return pendingProfileSync || storage.HasPendingProfileSync; }
+            catch { return pendingProfileSync; }
+        }
+
+        private void SetPendingProfileSync(bool pending)
+        {
+            pendingProfileSync = pending;
+            try { storage.SetPendingProfileSync(pending); } catch { }
         }
 
         private bool RememberRunId(string runId)
@@ -506,13 +586,15 @@ namespace BillusBucket
         {
             try
             {
-                return storage.GetOrCreateSafeDisplayName();
+                string name = storage.GetOrCreateSafeDisplayName();
+                return AnonymousPlayerIdentity.IsAutoGeneratedName(name) && name.StartsWith("BILLU_", StringComparison.OrdinalIgnoreCase)
+                    ? "GUEST_" + name.Substring(6) : name;
             }
             catch
             {
                 if (string.IsNullOrWhiteSpace(fallbackSessionName))
                 {
-                    fallbackSessionName = "BILLU_1000";
+                    fallbackSessionName = "GUEST_1000";
                 }
                 return fallbackSessionName;
             }

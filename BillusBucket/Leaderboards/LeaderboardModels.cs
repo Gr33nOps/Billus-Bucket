@@ -47,7 +47,16 @@ namespace BillusBucket
         public LeaderboardRankEntry(int rank, string displayName, BigInteger score, bool isCurrentPlayer = false)
         {
             Rank = Math.Max(1, rank);
-            DisplayName = LeaderboardStore.NormalizeName(displayName);
+            // Public board labels may contain a server-assigned # suffix.
+            // User-chosen profile names still use PlayerIdentityValidator.
+            string[] parts = (displayName ?? string.Empty).Split('#');
+            string label = LeaderboardStore.NormalizeName(parts[0]);
+            if (parts.Length == 2 && int.TryParse(parts[1], out int tag) && tag > 0)
+            {
+                string suffix = "#" + tag;
+                label = label.Substring(0, Math.Min(label.Length, Math.Max(1, 12 - suffix.Length))) + suffix;
+            }
+            DisplayName = label;
             Score = score < BigInteger.Zero ? BigInteger.Zero : score;
             IsCurrentPlayer = isCurrentPlayer;
         }

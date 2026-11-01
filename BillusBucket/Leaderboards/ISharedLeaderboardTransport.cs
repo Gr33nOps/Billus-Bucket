@@ -67,6 +67,7 @@ namespace BillusBucket
     public sealed class SharedLeaderboardRemoteResponse
     {
         public bool Success { get; }
+        public bool IsPermanentFailure { get; }
         public int? PlayerWeeklyRank { get; }
         public IReadOnlyList<LeaderboardRankEntry> Top10 { get; }
         public string ProfileDisplayName { get; }
@@ -79,9 +80,11 @@ namespace BillusBucket
             IReadOnlyList<LeaderboardRankEntry> top10 = null,
             string errorMessage = "",
             string profileDisplayName = null,
-            BigInteger? profilePersonalBest = null)
+            BigInteger? profilePersonalBest = null,
+            bool isPermanentFailure = false)
         {
             Success = success;
+            IsPermanentFailure = isPermanentFailure;
             PlayerWeeklyRank = playerWeeklyRank.HasValue && playerWeeklyRank.Value > 0
                 ? playerWeeklyRank
                 : null;
@@ -165,10 +168,18 @@ namespace BillusBucket
                 {
                     return new SharedLeaderboardRemoteResponse(
                         false,
-                        errorMessage: TryExtractServerError(json, "WEEKLY BOARD UNAVAILABLE"));
+                        errorMessage: FriendlyHttpError(response.StatusCode, json, "WEEKLY BOARD UNAVAILABLE"));
                 }
 
                 return ParseResponseJson(json);
+            }
+            catch (JsonException)
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "INVALID SERVER RESPONSE");
+            }
+            catch (OperationCanceledException)
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "CONNECTION TIMED OUT");
             }
             catch
             {
@@ -187,7 +198,7 @@ namespace BillusBucket
             try
             {
                 byte[] jsonBytes = SerializeSubmitPayload(payload);
-                return await SendPostJsonAsync(jsonBytes, "SCORE SAVED LOCALLY", "OFFLINE - SCORE SAVED LOCALLY");
+                return await SendPostJsonAsync(jsonBytes, "SCORE NOT ACCEPTED", "OFFLINE - SCORE SAVED LOCALLY");
             }
             catch
             {
@@ -206,7 +217,7 @@ namespace BillusBucket
             try
             {
                 byte[] jsonBytes = SerializeSaveProfilePayload(payload);
-                return await SendPostJsonAsync(jsonBytes, "NAME SAVED ON DEVICE", "OFFLINE - SAVED ON DEVICE");
+                return await SendPostJsonAsync(jsonBytes, "NAME NOT ACCEPTED", "OFFLINE - SAVED ON DEVICE");
             }
             catch
             {
@@ -256,10 +267,20 @@ namespace BillusBucket
                 {
                     return new SharedLeaderboardRemoteResponse(
                         false,
-                        errorMessage: TryExtractServerError(json, defaultHttpError));
+                        errorMessage: FriendlyHttpError(response.StatusCode, json, defaultHttpError),
+                        isPermanentFailure: (int)response.StatusCode >= 400 && (int)response.StatusCode < 500 &&
+                            (int)response.StatusCode != 429 && (int)response.StatusCode != 408);
                 }
 
                 return ParseResponseJson(json);
+            }
+            catch (JsonException)
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "INVALID SERVER RESPONSE");
+            }
+            catch (OperationCanceledException)
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "CONNECTION TIMED OUT");
             }
             catch
             {
@@ -338,6 +359,13 @@ namespace BillusBucket
             return buffer.ToArray();
         }
 
+        private static string FriendlyHttpError(System.Net.HttpStatusCode status, string json, string fallback)
+        {
+            if ((int)status == 429) return "TOO MANY REQUESTS - TRY LATER";
+            if ((int)status >= 500) return "SERVER BUSY - TRY AGAIN";
+            return TryExtractServerError(json, fallback);
+        }
+
         private static string TryExtractServerError(string json, string fallback)
         {
             if (string.IsNullOrWhiteSpace(json))
@@ -376,6 +404,12 @@ namespace BillusBucket
             using JsonDocument document = JsonDocument.Parse(json);
             JsonElement root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
+            {
+                return new SharedLeaderboardRemoteResponse(false, errorMessage: "INVALID SERVER RESPONSE");
+            }
+
+            if (!root.TryGetProperty("entries", out JsonElement validatedEntries) ||
+                validatedEntries.ValueKind != JsonValueKind.Array)
             {
                 return new SharedLeaderboardRemoteResponse(false, errorMessage: "INVALID SERVER RESPONSE");
             }

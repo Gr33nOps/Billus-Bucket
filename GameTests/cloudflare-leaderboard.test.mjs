@@ -229,7 +229,7 @@ test("end-to-end D1 SQLite submission, deduplication, best-score retention, and 
     assert.equal(firstJson.playerRank, 1);
     assert.equal(firstJson.entries.length, 1);
     assert.equal(firstJson.entries[0].score, "1500");
-    assert.match(firstJson.entries[0].displayName, /^BILLU_[1-9][0-9]{3}$/);
+    assert.match(firstJson.entries[0].displayName, /^GUEST_[1-9][0-9]{3}$/);
     assert.equal(firstJson.entries[0].isCurrentPlayer, true);
 
     // 3. Replaying the exact same runId returns 409 Conflict
@@ -256,7 +256,7 @@ test("end-to-end D1 SQLite submission, deduplication, best-score retention, and 
     assert.equal(lower.status, 200);
     const lowerJson = await lower.json();
     assert.equal(lowerJson.entries[0].score, "1500");
-    assert.equal(lowerJson.entries[0].displayName, "BILLU_2222");
+    assert.equal(lowerJson.entries[0].displayName, firstJson.entries[0].displayName);
 
     // 5. Populate 11 higher-scoring players from distinct IPs and verify alpha moves to rank #12
     for (let i = 1; i <= 11; i++) {
@@ -569,4 +569,81 @@ test("custom player name rename in-place, profanity filter, cross-device Save Co
   } finally {
     db.close();
   }
+});
+
+test("duplicate labels are distinct, guests are clear, and snapshots are never cached", async () => {
+  const db = createD1SqliteMock();
+  try {
+    const stamp = "2026-10-30T12:00:00.000Z";
+    const week = "2026-10-26T09:00:00.000Z";
+    for (const [hash, name, score] of [["a", "GR33N", 2000], ["b", "GR33N", 1000], ["c", "BILLU_9100", 500]]) {
+      db.sqlite.prepare("INSERT INTO weekly_leaderboard_scores VALUES (?, ?, ?, ?, ?, ?)")
+        .run(week, hash.repeat(64), name, score, stamp, "web");
+    }
+    const handler = createCloudflareLeaderboardHandler(() => Date.parse(stamp));
+    const response = await handler(new Request("https://lb.example/"), {DB:db, PLAYER_HASH_SALT:TEST_SALT});
+    const snapshot = await response.json();
+    assert.equal(new Set(snapshot.entries.map(e => e.displayName)).size, 3);
+    assert(snapshot.entries[2].displayName.startsWith("GUEST"));
+    assert.deepEqual(snapshot.entries.map(e => e.score), ["2000", "1000", "500"]);
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) AS n FROM weekly_leaderboard_scores").get().n, 3);
+  } finally { db.close(); }
+});
+
+test("a stale device cannot rename the cloud profile by submitting a run", async () => {
+  const db = createD1SqliteMock();
+  try {
+    const handler = createCloudflareLeaderboardHandler(() => Date.parse("2026-10-30T12:00:00.000Z"));
+    const env = {DB:db, PLAYER_HASH_SALT:TEST_SALT};
+    const post = body => handler(new Request("https://lb.example/", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}), env);
+    await post({action:"save_profile",playerId:"PLAYERONE1234",displayName:"NEW_NAME",personalBest:"0"});
+    const response = await post({playerId:"PLAYERONE1234",runId:"stale-device-run-0001",displayName:"OLD_NAME",score:"100",durationSeconds:10});
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).displayName, "NEW_NAME");
+  } finally { db.close(); }
+});
+
+test("Save Code collisions fail explicitly and never connect the wrong profile", async () => {
+  const db = createD1SqliteMock();
+  try {
+    const handler = createCloudflareLeaderboardHandler(() => Date.parse("2026-10-30T12:00:00.000Z"));
+    const env = {DB:db, PLAYER_HASH_SALT:TEST_SALT};
+    const post = body => handler(new Request("https://lb.example/", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}), env);
+    const first = await post({action:"save_profile",playerId:"LEGACYPLAYER111111",connectCode:"ABCD-EFGH-JKLM",displayName:"FIRST"});
+    assert.equal(first.status, 200);
+    const second = await post({action:"save_profile",playerId:"LEGACYPLAYER222222",connectCode:"ABCD-EFGH-JKLM",displayName:"SECOND"});
+    assert.equal(second.status, 409);
+    assert.equal((await second.json()).error, "SAVE CODE ALREADY IN USE");
+    const restored = await post({action:"restore_profile",connectCode:"ABCD-EFGH-JKLM"});
+    assert.equal((await restored.json()).displayName, "FIRST");
+  } finally { db.close(); }
+});
+
+test("v1 raw UUID and v2 normalized UUID reconcile only with possession of that identity", async () => {
+  const db = createD1SqliteMock();
+  try {
+    const raw = "9f8e7d6c-5b4a-3928-1706-f5e4d3c2b1a0";
+    const normalized = raw.replaceAll("-", "").toUpperCase();
+    const hash = async value => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${TEST_SALT}:player:${value}`)))).map(x => x.toString(16).padStart(2,"0")).join("");
+    const legacy = await hash(raw), modern = await hash(normalized);
+    const stamp = "2026-10-30T12:00:00.000Z", week = "2026-10-26T09:00:00.000Z";
+    for (const [id,name,score] of [[legacy,"BILLU_9100",9000],[modern,"GR33N",5000]]) {
+      db.sqlite.prepare("INSERT INTO player_profiles (player_hash,display_name,all_time_best,source_platform,created_at,updated_at) VALUES (?,?,?,?,?,?)").run(id,name,score,"web",stamp,stamp);
+      db.sqlite.prepare("INSERT INTO weekly_leaderboard_scores VALUES (?,?,?,?,?,?)").run(week,id,name,score,stamp,"web");
+    }
+    const handler = createCloudflareLeaderboardHandler(() => Date.parse(stamp));
+    const env = {DB:db, PLAYER_HASH_SALT:TEST_SALT};
+    const response = await handler(new Request(`https://lb.example/?playerId=${encodeURIComponent(raw)}`), env);
+    assert.equal(response.status,200);
+    const result = await response.json();
+    assert.equal(result.entries.length,1);
+    assert.equal(result.entries[0].displayName,"GR33N");
+    assert.equal(result.entries[0].score,"9000");
+    assert.equal(result.entries[0].isCurrentPlayer,true);
+    assert.equal(result.personalBest,"9000");
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) AS n FROM player_profiles").get().n,1);
+    const repeat = await handler(new Request(`https://lb.example/?playerId=${normalized}`),env);
+    assert.equal((await repeat.json()).entries.length,1);
+  } finally {db.close();}
 });

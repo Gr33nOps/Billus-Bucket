@@ -96,6 +96,7 @@ function buildCorsHeaders(origin, allowedList) {
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Vary": "Origin",
     "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
   };
 }
 
@@ -119,9 +120,13 @@ export function normalizePlayerToken(rawToken) {
   return /^[A-Z0-9]{12,64}$/.test(compact) ? compact : "";
 }
 
+function publicGuestName(name) {
+  return /^BILLU_[1-9][0-9]{3}$/.test(name) ? "GUEST_" + name.slice(6) : name;
+}
+
 function fallbackDisplayName(playerHash) {
   const fallbackNum = (parseInt(playerHash.slice(0, 8), 16) % 9000) + 1000;
-  return `BILLU_${fallbackNum}`;
+  return `GUEST_${fallbackNum}`;
 }
 
 /**
@@ -188,7 +193,7 @@ function isUniqueConstraintError(err) {
     .test(message);
 }
 
-async function resolveCanonicalPlayerHash(db, hashSalt, normalizedToken) {
+async function resolveCanonicalPlayerHash(db, hashSalt, normalizedToken, originalToken = "") {
   if (!normalizedToken) {
     return "";
   }
@@ -199,9 +204,62 @@ async function resolveCanonicalPlayerHash(db, hashSalt, normalizedToken) {
      WHERE alias_hash = ?`,
   ).bind(rawHash).first();
 
-  return aliasRow?.canonical_player_hash
+  const canonicalHash = aliasRow?.canonical_player_hash
     ? String(aliasRow.canonical_player_hash)
     : rawHash;
+
+  // v1 hashed the exact stored UUID, while v2 normalizes it. Possession of
+  // that original token proves both records belong to the same identity.
+  const legacyToken = typeof originalToken === "string" ? originalToken.trim() : "";
+  if (legacyToken && legacyToken !== normalizedToken &&
+      normalizePlayerToken(legacyToken) === normalizedToken) {
+    const legacyHash = await sha256Hex(`${hashSalt}:player:${legacyToken}`);
+    if (legacyHash !== canonicalHash) {
+      const legacyProfile = await db.prepare(
+        `SELECT player_hash FROM player_profiles WHERE player_hash = ?`,
+      ).bind(legacyHash).first();
+      if (legacyProfile) await reconcileLegacyProfile(db, legacyHash, canonicalHash);
+    }
+  }
+  return canonicalHash;
+}
+
+async function reconcileLegacyProfile(db, legacyHash, canonicalHash) {
+  await db.batch([
+    db.prepare(
+      `INSERT INTO player_profiles (player_hash, display_name, all_time_best, source_platform, created_at, updated_at)
+       SELECT ?, display_name, all_time_best, source_platform, created_at, updated_at
+       FROM player_profiles WHERE player_hash = ?
+       ON CONFLICT (player_hash) DO UPDATE SET
+         all_time_best = MAX(player_profiles.all_time_best, excluded.all_time_best),
+         created_at = MIN(player_profiles.created_at, excluded.created_at),
+         updated_at = MAX(player_profiles.updated_at, excluded.updated_at),
+         display_name = CASE
+           WHEN player_profiles.display_name GLOB 'BILLU_[1-9][0-9][0-9][0-9]'
+             OR player_profiles.display_name GLOB 'GUEST_[1-9][0-9][0-9][0-9]'
+           THEN excluded.display_name ELSE player_profiles.display_name END`,
+    ).bind(canonicalHash, legacyHash),
+    db.prepare(
+      `INSERT INTO weekly_leaderboard_scores (week_start, player_hash, display_name, best_score, submitted_at, source_platform)
+       SELECT week_start, ?, (SELECT display_name FROM player_profiles WHERE player_hash = ?),
+         best_score, submitted_at, source_platform FROM weekly_leaderboard_scores WHERE player_hash = ?
+       ON CONFLICT (week_start, player_hash) DO UPDATE SET
+         best_score = MAX(weekly_leaderboard_scores.best_score, excluded.best_score),
+         display_name = excluded.display_name,
+         submitted_at = CASE
+           WHEN excluded.best_score > weekly_leaderboard_scores.best_score THEN excluded.submitted_at
+           WHEN excluded.best_score = weekly_leaderboard_scores.best_score THEN MIN(excluded.submitted_at, weekly_leaderboard_scores.submitted_at)
+           ELSE weekly_leaderboard_scores.submitted_at END`,
+    ).bind(canonicalHash, canonicalHash, legacyHash),
+    db.prepare(`UPDATE leaderboard_submitted_runs SET player_hash = ? WHERE player_hash = ?`).bind(canonicalHash, legacyHash),
+    db.prepare(`UPDATE player_profile_aliases SET canonical_player_hash = ? WHERE canonical_player_hash = ?`).bind(canonicalHash, legacyHash),
+    db.prepare(
+      `INSERT INTO player_profile_aliases (alias_hash, canonical_player_hash, created_at) VALUES (?, ?, ?)
+       ON CONFLICT (alias_hash) DO UPDATE SET canonical_player_hash = excluded.canonical_player_hash`,
+    ).bind(legacyHash, canonicalHash, new Date().toISOString()),
+    db.prepare(`DELETE FROM weekly_leaderboard_scores WHERE player_hash = ?`).bind(legacyHash),
+    db.prepare(`DELETE FROM player_profiles WHERE player_hash = ?`).bind(legacyHash),
+  ]);
 }
 
 async function bindConnectCodeAliasIfNeeded(
@@ -226,7 +284,7 @@ async function bindConnectCodeAliasIfNeeded(
     `SELECT player_hash FROM player_profiles WHERE player_hash = ?`,
   ).bind(codeHash).first();
   if (existingProfile) {
-    return;
+    throw new Error("SAVE_CODE_CONFLICT");
   }
 
   await db.prepare(
@@ -234,6 +292,12 @@ async function bindConnectCodeAliasIfNeeded(
      VALUES (?, ?, ?)
      ON CONFLICT (alias_hash) DO NOTHING`,
   ).bind(codeHash, canonicalPlayerHash, nowIso).all();
+  const bound = await db.prepare(
+    `SELECT canonical_player_hash FROM player_profile_aliases WHERE alias_hash = ?`,
+  ).bind(codeHash).first();
+  if (bound?.canonical_player_hash !== canonicalPlayerHash) {
+    throw new Error("SAVE_CODE_CONFLICT");
+  }
 }
 
 async function checkRateLimit(db, bucketKey, maxPerMinute, nowMs) {
@@ -265,9 +329,15 @@ async function checkRateLimit(db, bucketKey, maxPerMinute, nowMs) {
 async function getWeeklyLeaderboardSnapshot(db, weekStart, playerHash, limit) {
   const safeLimit = Math.min(10, Math.max(1, Math.floor(Number(limit) || 10)));
   const topResult = await db.prepare(
-    `SELECT player_hash, display_name, best_score
-     FROM weekly_leaderboard_scores
-     WHERE week_start = ?
+    `WITH labels AS (
+       SELECT player_hash, best_score, submitted_at,
+         CASE WHEN display_name GLOB 'BILLU_[1-9][0-9][0-9][0-9]'
+           THEN 'GUEST_' || substr(display_name, 7) ELSE display_name END AS display_name
+       FROM weekly_leaderboard_scores WHERE week_start = ?
+     )
+     SELECT *, COUNT(*) OVER (PARTITION BY display_name) AS name_count,
+       ROW_NUMBER() OVER (ORDER BY player_hash) AS player_number
+     FROM labels
      ORDER BY best_score DESC, submitted_at ASC, player_hash ASC
      LIMIT ?`,
   ).bind(weekStart, safeLimit).all();
@@ -284,9 +354,12 @@ async function getWeeklyLeaderboardSnapshot(db, weekStart, playerHash, limit) {
       playerRank = rank;
     }
 
+    const baseName = String(row.display_name);
+    // Distinguish profiles without combining their scores or exposing credentials.
+    const suffix = Number(row.name_count) > 1 ? `#${row.player_number}` : "";
     return {
       rank,
-      displayName: String(row.display_name),
+      displayName: baseName.slice(0, 12 - suffix.length) + suffix,
       score: String(row.best_score),
       isCurrentPlayer,
     };
@@ -336,7 +409,7 @@ async function getWeeklyLeaderboardSnapshot(db, weekStart, playerHash, limit) {
     ).bind(playerHash).first();
 
     if (profileRow) {
-      profileDisplayName = String(profileRow.display_name);
+      profileDisplayName = publicGuestName(String(profileRow.display_name));
       profileAllTimeBest = String(profileRow.all_time_best ?? 0);
     }
   }
@@ -452,7 +525,7 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
 
         try {
           const playerHash = normalizedToken
-            ? await resolveCanonicalPlayerHash(db, hashSalt, normalizedToken)
+            ? await resolveCanonicalPlayerHash(db, hashSalt, normalizedToken, url.searchParams.get("playerId"))
             : "";
           const snapshot = await getWeeklyLeaderboardSnapshot(
             db,
@@ -531,6 +604,7 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
               db,
               hashSalt,
               normalizedToken,
+              body?.playerId,
             );
             await bindConnectCodeAliasIfNeeded(
               db,
@@ -578,6 +652,9 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
               { status: 200, headers },
             );
           } catch (_err) {
+            if (_err?.message === "SAVE_CODE_CONFLICT") {
+              return new Response(JSON.stringify({ error: "SAVE CODE ALREADY IN USE" }), {status:409, headers});
+            }
             return new Response(
               JSON.stringify({ error: "FAILED TO SAVE PROFILE" }),
               { status: 500, headers },
@@ -592,7 +669,7 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
           const normalizedCode = normalizePlayerToken(
             body?.connectCode ?? body?.playerId,
           );
-          if (!normalizedCode) {
+          if (!normalizedCode || normalizedCode.length !== 12) {
             return new Response(
               JSON.stringify({ found: false, error: "ENTER 12-CHAR SAVE CODE" }),
               { status: 400, headers },
@@ -665,7 +742,7 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
               JSON.stringify({
                 found: true,
                 ...snapshot,
-                displayName: String(profileRow.display_name),
+                displayName: publicGuestName(String(profileRow.display_name)),
                 personalBest: String(profileRow.all_time_best ?? 0),
               }),
               { status: 200, headers },
@@ -754,6 +831,7 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
             db,
             hashSalt,
             normalizedToken,
+            body?.playerId,
           );
           ipAllowed = await checkRateLimit(
             db,
@@ -789,16 +867,13 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
         const pruneRunsBefore = new Date(nowMs - 30 * 86_400_000).toISOString();
 
         try {
-          if (/^BILLU_[1-9][0-9]{3}$/.test(safeDisplayName)) {
-            const existingProfile = await db.prepare(
-              `SELECT display_name FROM player_profiles WHERE player_hash = ?`,
-            ).bind(playerHash).first();
-            if (
-              existingProfile?.display_name &&
-              !/^BILLU_[1-9][0-9]{3}$/.test(String(existingProfile.display_name))
-            ) {
-              safeDisplayName = String(existingProfile.display_name);
-            }
+          // Only save_profile renames an existing profile. A stale device's run
+          // must not undo a name change made on another device.
+          const existingProfile = await db.prepare(
+            `SELECT display_name FROM player_profiles WHERE player_hash = ?`,
+          ).bind(playerHash).first();
+          if (existingProfile?.display_name) {
+            safeDisplayName = String(existingProfile.display_name);
           }
 
           await bindConnectCodeAliasIfNeeded(
@@ -860,6 +935,9 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
             ).bind(pruneRunsBefore),
           ]);
         } catch (submitErr) {
+          if (submitErr?.message === "SAVE_CODE_CONFLICT") {
+            return new Response(JSON.stringify({ error: "SAVE CODE ALREADY IN USE" }), {status:409, headers});
+          }
           return new Response(
             JSON.stringify({ error: "Duplicate or rejected run submission." }),
             {

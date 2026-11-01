@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Net;
+using System.Threading;
 using System.Numerics;
 using System.Threading.Tasks;
 using BillusBucket;
@@ -28,6 +30,9 @@ namespace GameTests
             TestPokiAdapterZeroNetworkByDefault();
             TestSharedOnlineAdapterAndOfflineFallback();
             TestPlayerNameValidationAndCloudProfileSync();
+            TestLeaderboardRecoveryAndConcurrency();
+            TestProfileReconnect();
+            TestLeaderboardHttpErrors();
             TestPlatformLifecycleGuard();
             TestEdgeCaseSafety();
 
@@ -838,6 +843,103 @@ namespace GameTests
             Equal(0, pokiSpy.SaveProfileCount, "unapproved Poki build makes zero network calls when saving name");
         }
 
+        private sealed class ResponseHandler : HttpMessageHandler
+        {
+            public HttpStatusCode Status = HttpStatusCode.OK;
+            public string Json = "{}";
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+                => Task.FromResult(new HttpResponseMessage(Status) {Content = new StringContent(Json)});
+        }
+
+        private static void TestLeaderboardHttpErrors()
+        {
+            var handler = new ResponseHandler();
+            using var client = new HttpClient(handler);
+            var transport = new HttpSharedLeaderboardTransport(client, "https://test.invalid/");
+            Equal(false, transport.FetchWeeklyTop10Async("TESTPLAYER1234", "web").GetAwaiter().GetResult().Success,
+                "malformed success response is not treated as an empty online board");
+            handler.Status = HttpStatusCode.TooManyRequests;
+            Equal("TOO MANY REQUESTS - TRY LATER", transport.FetchWeeklyTop10Async("TESTPLAYER1234", "web").GetAwaiter().GetResult().ErrorMessage,
+                "rate limiting has an actionable connection message");
+            handler.Status = HttpStatusCode.ServiceUnavailable;
+            Equal("SERVER BUSY - TRY AGAIN", transport.FetchWeeklyTop10Async("TESTPLAYER1234", "web").GetAwaiter().GetResult().ErrorMessage,
+                "server failure is distinguished from offline");
+        }
+
+        private static void TestProfileReconnect()
+        {
+            var transport = new CountingTransport { SimulateOffline = true };
+            var storage = new InMemoryScoreStorage();
+            var service = new SharedOnlineLeaderboardService(storage, transport);
+            service.UpdatePlayerNameAsync("LOCAL_NAME").GetAwaiter().GetResult();
+            transport.SimulateOffline = false;
+            service = new SharedOnlineLeaderboardService(storage, transport); // Recreate after a page reload.
+            service.RefreshRankingsAsync().GetAwaiter().GetResult();
+            Equal(2, transport.SaveProfileCount, "refresh retries a name saved while offline");
+            Equal("LOCAL_NAME", service.PlayerDisplayName, "offline name survives reconnection");
+            transport.FetchProfileName = "REMOTE_NAME";
+            service.RefreshRankingsAsync().GetAwaiter().GetResult();
+            Equal("REMOTE_NAME", service.PlayerDisplayName, "cloud rename syncs to a device with an existing custom name");
+            Equal(true, new LeaderboardRankEntry(1, "GR33N#2", 100).DisplayName.Contains('#'), "public duplicate-name discriminator survives parsing");
+            var existingDevice = new SharedOnlineLeaderboardService(new InMemoryScoreStorage(initialBest:999990), transport);
+            var remotePlayer = new SharedOnlineLeaderboardService(new InMemoryScoreStorage(initialBest:100), transport);
+            remotePlayer.UpdatePlayerNameAsync("OTHER_PLAYER").GetAwaiter().GetResult();
+            existingDevice.RestoreProfileByCodeAsync(remotePlayer.PlayerConnectCode).GetAwaiter().GetResult();
+            Equal(new BigInteger(100), existingDevice.GetPersonalBest(), "restoring another profile does not import previous player's score");
+            existingDevice.RefreshRankingsAsync().GetAwaiter().GetResult();
+            Equal(new BigInteger(100), existingDevice.GetPersonalBest(), "previous local best cannot return on refresh");
+            var directory = Path.Combine(Path.GetTempPath(), "billu-profile-review-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var scoreFile = Path.Combine(directory, "scores.json");
+                var desktop = new DesktopScoreStorage(new LeaderboardStore(scoreFile), directory);
+                desktop.SavePersonalBest(999990);
+                desktop.ApplyRestoredProfile(remotePlayer.PlayerConnectCode, "OTHER_PLAYER", 100);
+                Equal(new BigInteger(100), desktop.LoadPersonalBest(), "desktop restore isolates the profile best");
+                var reloaded = new DesktopScoreStorage(new LeaderboardStore(scoreFile), directory);
+                Equal(new BigInteger(100), reloaded.LoadPersonalBest(), "desktop profile best survives restart");
+            }
+            finally { Directory.Delete(directory, recursive:true); }
+
+
+        }
+
+        private static void TestLeaderboardRecoveryAndConcurrency()
+        {
+            var transport = new CountingTransport();
+            var service = new SharedOnlineLeaderboardService(new InMemoryScoreStorage(), transport);
+            service.InitializeAsync().GetAwaiter().GetResult();
+            transport.SimulateOffline = true;
+            service.RefreshRankingsAsync().GetAwaiter().GetResult();
+            Equal(null, service.CurrentSnapshot.CurrentPlayerWeeklyRank, "offline rank is unknown");
+            transport.SimulateOffline = false;
+            transport.EmptySubmission = true;
+            service.SubmitRunScoreAsync("new-week-empty-response", 100, 10).GetAwaiter().GetResult();
+            Equal(0, service.CurrentSnapshot.WeeklyTop10.Count, "empty authoritative board clears cached rows");
+            Equal(null, service.CurrentSnapshot.CurrentPlayerWeeklyRank, "empty response cannot revive stale rank");
+
+            transport.ThrowFetch = true;
+            service.RefreshRankingsAsync().GetAwaiter().GetResult();
+            Equal(false, service.CurrentSnapshot.IsLoading, "throwing transport never leaves loading stuck");
+            Equal(false, service.CurrentSnapshot.IsOnlineAvailable, "throwing transport clears online state");
+
+            transport.ThrowFetch = false;
+            var pendingSubmit = new TaskCompletionSource<SharedLeaderboardRemoteResponse>();
+            transport.PendingSubmit = pendingSubmit.Task;
+            var oldSubmit = service.SubmitRunScoreAsync("old-profile-inflight-run", 200, 10);
+            transport.PendingSubmit = null;
+            var other = new SharedOnlineLeaderboardService(new InMemoryScoreStorage(), transport);
+            other.UpdatePlayerNameAsync("RESTORED").GetAwaiter().GetResult();
+            service.RestoreProfileByCodeAsync(other.PlayerConnectCode).GetAwaiter().GetResult();
+            pendingSubmit.SetResult(new SharedLeaderboardRemoteResponse(true, playerWeeklyRank:99, profilePersonalBest:999990));
+            oldSubmit.GetAwaiter().GetResult();
+            Equal(1, service.CurrentSnapshot.CurrentPlayerWeeklyRank, "old submission cannot overwrite restored rank");
+            Equal(false, service.GetPersonalBest() == 999990, "old submission cannot import another profile best");
+
+            Equal(true, AnonymousPlayerIdentity.CreateSafeDisplayName("test-identity").StartsWith("GUEST"), "default name clearly identifies a guest");
+        }
+
         // =====================================================================
         // Test Doubles
         // =====================================================================
@@ -886,6 +988,10 @@ namespace GameTests
 
             public Task<SharedLeaderboardRemoteResponse> PendingFetch { get; set; }
             public bool SimulateOffline { get; set; }
+            public string FetchProfileName { get; set; }
+            public bool ThrowFetch { get; set; }
+            public bool EmptySubmission { get; set; }
+            public Task<SharedLeaderboardRemoteResponse> PendingSubmit { get; set; }
             public int FetchCount { get; private set; }
             public int SubmitCount { get; private set; }
             public int SaveProfileCount { get; private set; }
@@ -895,6 +1001,7 @@ namespace GameTests
                 string anonymousPlayerId,
                 string sourcePlatform)
             {
+                if (ThrowFetch) throw new HttpRequestException("test disconnect");
                 FetchCount++;
                 if (PendingFetch != null) return PendingFetch;
                 if (SimulateOffline)
@@ -909,12 +1016,14 @@ namespace GameTests
                     new LeaderboardRankEntry(1, "BILLU_1001", 9500),
                     new LeaderboardRankEntry(2, "BILLU_2044", 7200)
                 };
-                return Task.FromResult(new SharedLeaderboardRemoteResponse(true, playerWeeklyRank: 4, top10: sample));
+                return Task.FromResult(new SharedLeaderboardRemoteResponse(true, playerWeeklyRank: 4, top10: sample, profileDisplayName: FetchProfileName));
             }
 
             public Task<SharedLeaderboardRemoteResponse> SubmitScoreAsync(SharedScoreSubmissionPayload payload)
             {
                 SubmitCount++;
+                if (PendingSubmit != null) return PendingSubmit;
+                if (EmptySubmission) return Task.FromResult(new SharedLeaderboardRemoteResponse(true));
                 if (SimulateOffline)
                 {
                     return Task.FromResult(new SharedLeaderboardRemoteResponse(
