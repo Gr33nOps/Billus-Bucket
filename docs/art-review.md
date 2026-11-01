@@ -21,3 +21,5 @@ The muted distant scenery, distinct cloud silhouettes, banknote colours, plant/p
 - Mobile landscape viewport checks at 844x390, 667x320 and 568x240, plus portrait prompt: passed.
 
 Visual review covers these assets and states; artistic preference still benefits from feedback during play.
+
+Follow-up: closed the two teal gaps at the scarf neck edge in both directions; added matching shirt hems, trouser folds and tank-like bucket reflections. Directional scarf and outline regression checks pass in every walk frame.

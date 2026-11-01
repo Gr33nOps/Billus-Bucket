@@ -23,3 +23,10 @@ for step in range(4):
  l={(x,y) for y in range(28,35) for x in range(32) if left.getpixel((x,y)) in gold}
  assert r and {(31-x,y) for x,y in r}==l,('scarf did not turn with torso',step)
 print('Directional scarf placement passed.')
+
+ink=(35,36,56,255)
+for step in range(4):
+ for x,y in [(9,17),(8,18)]:
+  assert frames[4+step].getpixel((4+x,12+y))==ink,('shirt pixel breaks scarf edge',step)
+  assert frames[8+step].getpixel((27-x,12+y))==ink,('left scarf edge',step)
+print('Scarf neck outline passed in all walking frames.')

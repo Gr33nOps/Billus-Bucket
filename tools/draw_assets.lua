@@ -52,10 +52,15 @@ poly(bucket,{{5,5},{22,5},{20,12},{19,13},{8,13},{6,11}},'blue')
 -- Broad metal shading: the light stays upper-left in every facing.
 line(bucket,6,7,7,10,'bluelight');line(bucket,7,11,9,12,'bluelight')
 line(bucket,21,7,20,11,'blueshade')
+-- A broad reflected patch and a shaded bottom seam, like the rooftop tank.
+rect(bucket,8,7,3,3,0x5299b1)
+line(bucket,10,13,18,13,'blueshade')
+line(bucket,15,10,17,10,0x5299b1)
 -- An open oval mouth, with a bright front lip distinct from the body.
 oval(bucket,0,0,28,7,'ink');oval(bucket,2,1,24,5,'bluelight')
 oval(bucket,4,2,20,3,'ink')
 rect(bucket,4,5,20,1,'bluelight');rect(bucket,7,6,14,1,'blue')
+line(bucket,5,1,11,1,'rim')
 saveFrames('bucket',{bucket},28,16)
 -- Square browser icon: preserve the exact game's 28x16 bucket proportions.
 local favicon=img(32,32);paste(favicon,bucket,2,8)
@@ -148,11 +153,17 @@ local function sideWalk(step,left)
  line(a,16,18,16,20,'gold')
  -- Close the scarf silhouette before turning, including the shirt edge behind it.
  rect(a,18,18,1,5,'ink')
+ px(a,9,17,'ink');px(a,8,18,'ink')
  if left then
   local turned=img(24,32)
   for y=0,31 do for x=0,23 do turned:drawPixel(23-x,y,a:getPixel(x,y)) end end
   a=turned
  end
+ -- A short shirt hem and trouser fold use the same restrained prop shading.
+ for x=10,14 do if a:getPixel(x,22)==col('teal') then px(a,x,22,'tealshade') end end
+ for y=25,27 do for x=8,16 do
+  if a:getPixel(x,y)==col('pants') and a:getPixel(x-1,y)==col('ink') then px(a,x,y,'pantslight') end
+ end end
  -- Keep highlights on the world-facing upper-left surfaces.
  for y=18,22 do
   for x=7,17 do
@@ -160,7 +171,8 @@ local function sideWalk(step,left)
   end
  end
  for y=19,21 do
-  if a:getPixel(10,y)==col('teal') then px(a,10,y,'teallight') end
+  local hx=left and 10 or 11
+  if a:getPixel(hx,y)==col('teal') or a:getPixel(hx,y)==col('tealshade') then px(a,hx,y,'teallight') end
  end
  return outlineBillu(simplifyBillu(a))
 end
