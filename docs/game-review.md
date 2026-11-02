@@ -26,3 +26,9 @@ These checks establish the tested behaviors; they cannot guarantee absence of ev
 Replaced periodic sideways waves and reflected side-wall motion with seeded, smooth random drift targets. Successive moves can continue left or right or change direction, with a different pacing per note. Drift is limited to 56 native pixels from spawn and to the existing inset catch-area bounds (which allow the rotated sprite to remain visible). The targets stay inside those limits, eliminating invisible-wall bounces. Rotation follows sideways motion with a small flutter; vertical fall speed and bomb behaviour retain their existing tuning.
 
 Regression checks cover continued motion in both directions, reversals, frame-rate independence, positive fall speed, bounded displacement, chaseable sideways speed and smooth edge turns across seeded falls. Release build, gameplay/difficulty tests and desktop/mobile browser checks passed.
+
+## Note momentum follow-up — 2026-11-02
+
+Play feedback showed that position waypoints slowed the paper too much at each transition. Replaced them with a small momentum model: each note starts gliding sideways at 24–42 native pixels/sec; seeded breezes occasionally choose another velocity, and the note eases toward it. The wind can keep carrying it the same way or gradually turn it. A soft inward breeze near the catch-area edges and an 88-pixel travel corridor prevent wall bounces and keep paper within reach. Sprite lean follows actual sideways velocity.
+
+Physics uses fixed 120 Hz steps, preserving the path across frame rates. A new regression first failed on the former waypoint motion; it now verifies an immediate sideways glide and visible horizontal travel through over 70% of sampled flight frames across 80 seeds. Existing smooth-edge, direction variety, bounds, fall-speed, frame-rate, gameplay and difficulty checks also passed, along with the warnings-as-errors Release build and desktop/mobile browser checks.

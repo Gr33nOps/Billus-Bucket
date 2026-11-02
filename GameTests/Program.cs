@@ -402,6 +402,25 @@ namespace GameTests
                 Equal(true, edgeNote.X >= 59f && edgeNote.X <= 259f, "gusts keep notes inside the play area");
             }
 
+            int movingFrames = 0, sampledFrames = 0;
+            for (int seed = 0; seed < 80; seed++)
+            {
+                DropMotion gliding = new DropMotion(DropKind.Cash, 160f, -12f, 35f,
+                    seed, left: 59f, right: 259f);
+                gliding.Update(.05f);
+                Equal(true, Math.Abs(gliding.X - 160f) > .4f,
+                    "notes begin with a visible sideways glide instead of a vertical drop");
+                for (int frame = 0; frame < 240; frame++)
+                {
+                    float prior = gliding.X;
+                    gliding.Update(1f / 60f);
+                    if (Math.Abs(gliding.X - prior) * 60f > 8f) movingFrames++;
+                    sampledFrames++;
+                }
+            }
+            Equal(true, movingFrames > sampledFrames * .70f,
+                "notes visibly glide through most of a fall without waypoint pauses");
+
             int continuesLeft = 0, continuesRight = 0, reverses = 0;
             for (int seed = 0; seed < 200; seed++)
             {

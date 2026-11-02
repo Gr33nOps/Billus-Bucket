@@ -20,8 +20,6 @@ namespace BillusBucket
         private readonly float startX;
         private readonly float startY;
         private readonly float speed;
-        private readonly float leftBound;
-        private readonly float rightBound;
 
         private readonly float phase;
         private readonly float frequency;
@@ -30,6 +28,11 @@ namespace BillusBucket
         private readonly float driftRight;
         private readonly uint windSeed;
         private readonly float flutterRate;
+        private double motionAge;
+        private int windSteps;
+        private float windX;
+        private float windVelocity;
+        private const float WindStep = 1f / 120f;
 
         public DropKind Kind { get; }
         public float X { get; private set; }
@@ -65,18 +68,20 @@ namespace BillusBucket
             X = x;
             Y = y;
             this.speed = speed;
-            leftBound = left;
-            rightBound = right;
 
             Random random = seed.HasValue ? new Random(seed.Value) : Random.Shared;
             phase = (float)random.NextDouble() * MathF.PI * 2f;
             frequency = 1.5f + (float)random.NextDouble() * 1.7f;
-            driftPeriod = 1.25f + (float)random.NextDouble() * .6f;
+            driftPeriod = .9f + (float)random.NextDouble() * .65f;
             windSeed = (uint)random.Next();
-            // Leave space for the rotated 12x8 note at both edges. Wind targets
-            // lie inside these limits, so the note never needs a wall bounce.
-            driftLeft = Math.Max(x - 56f, left);
-            driftRight = Math.Min(x + 56f, right);
+            // A soft wind corridor keeps paper within reach and inside the sprite margins.
+            driftLeft = Math.Max(x - 88f, left);
+            driftRight = Math.Min(x + 88f, right);
+            if (driftRight < driftLeft) driftRight = driftLeft;
+            windX = Math.Clamp(x, driftLeft, driftRight);
+            windVelocity = WindVelocity(0);
+            if (windX - driftLeft < 20f) windVelocity = Math.Abs(windVelocity);
+            if (driftRight - windX < 20f) windVelocity = -Math.Abs(windVelocity);
             flutterRate = 4f + (float)random.NextDouble() * 6f;
         }
 
@@ -87,7 +92,8 @@ namespace BillusBucket
                 return;
             }
 
-            Age += seconds;
+            motionAge += seconds;
+            Age = (float)motionAge;
 
             if (Kind == DropKind.Bomb)
             {
@@ -96,34 +102,36 @@ namespace BillusBucket
                 return;
             }
 
-            // Fresh seeded wind points, rather than a repeating oscillation.
-            // Consecutive targets may continue left/right or reverse direction.
-            float progress = Age / driftPeriod;
-            int segment = (int)Math.Min((double)progress, int.MaxValue - 1);
-            float t = Math.Clamp(progress - segment, 0f, 1f);
-            float from = WindPoint(segment);
-            float to = WindPoint(segment + 1);
-            float blend = t * t * (3f - 2f * t);
-            X = from + (to - from) * blend;
-
-            float sidewaysSpeed = (to - from) * 6f * t * (1f - t) / driftPeriod;
-            Rotation = Math.Clamp(sidewaysSpeed / 130f, -.45f, .45f)
-                     + .18f * MathF.Sin(Age * frequency * 1.7f + phase);
+            // Paper carries sideways momentum. New breezes adjust its velocity
+            // gradually, so passing a wind change never stops it at a waypoint.
+            // Fixed small steps keep the same path at 30, 60 and 120 fps.
+            double windAge = Math.Min(motionAge, 60d); // Drops leave the screen long before this.
+            int targetSteps = (int)Math.Floor(windAge * 120d + .00001d);
+            while (windSteps < targetSteps)
+            {
+                float time = windSteps * WindStep;
+                float desired = WindVelocity((int)(time / driftPeriod));
+                float leftPressure = Math.Clamp((30f - (windX - driftLeft)) / 30f, 0f, 1f);
+                float rightPressure = Math.Clamp((30f - (driftRight - windX)) / 30f, 0f, 1f);
+                desired += 85f * (leftPressure * leftPressure - rightPressure * rightPressure);
+                windVelocity += (desired - windVelocity) * (2.6f * WindStep);
+                windX += windVelocity * WindStep;
+                windSteps++;
+            }
+            float remainder = Math.Max(0f, (float)(windAge - windSteps / 120d));
+            X = Math.Clamp(windX + windVelocity * remainder, driftLeft, driftRight);
+            Rotation = Math.Clamp(windVelocity / 95f, -.45f, .45f)
+                     + .14f * MathF.Sin(Age * frequency * 1.7f + phase);
 
             // Compute Y directly from Age so fall distance stays identical at any frame rate.
             float verticalFlutter = (0.12f / frequency) * (MathF.Sin(Age * frequency + phase) - MathF.Sin(phase));
             Y = startY + speed * (Age + verticalFlutter);
         }
 
-        private float WindPoint(int index)
+        private float WindVelocity(int index)
         {
-            if (rightBound <= leftBound)
-                return leftBound;
-            if (index == 0)
-                return Math.Clamp(startX, driftLeft, driftRight);
-
-            // Stateless hash: identical motion at all frame rates, including
-            // skipped frames; no per-frame randomness or integration drift.
+            // Each breeze chooses a direction independently; it can keep
+            // carrying the note the same way or ease it into a turn.
             uint value;
             unchecked
             {
@@ -133,7 +141,7 @@ namespace BillusBucket
                 value ^= value >> 16;
             }
             float roll = (value >> 8) / 16777215f;
-            return driftLeft + (driftRight - driftLeft) * roll;
+            return (value % 2 == 0 ? -1f : 1f) * (24f + roll * 18f);
         }
     }
 }
