@@ -146,8 +146,8 @@ def paper(duration=.08):
     for i in range(len(result)):
         t = i / RATE
         noise = rng.uniform(-1, 1)
-        low = low * .8 + noise * .2
-        result[i] = (noise - low) * .10 * math.sin(math.pi * t / duration) ** 2
+        low = low * .93 + noise * .07
+        result[i] = low * .30 * math.sin(math.pi * t / duration) ** 2
     return result
 
 
@@ -217,12 +217,11 @@ def compose_music():
 
 
 def compose_effects():
-    # Paper landing in the blue bucket: rustle followed by a small rim clink.
-    pickup = silence(.24)
-    mix(pickup, paper(), 0, .9)
-    mix(pickup, paper(), .035, .3)
-    mix(pickup, pluck(93, .09, True), .045, .09)
-    export("catch", pickup, .43)
+    # Soft low-pass paper rustle, with no pitched impact or metallic transient.
+    pickup = silence(.20)
+    mix(pickup, paper(.14), 0, .9)
+    mix(pickup, paper(.10), .065, .25)
+    export("catch", pickup, .28)
 
     cues = {
         "start": [(0, 62), (.085, 66), (.17, 69), (.29, 74)],

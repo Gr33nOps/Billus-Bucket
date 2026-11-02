@@ -422,9 +422,10 @@ for i,b in ipairs(buildings) do local x,y,w=table.unpack(b)
  local room=4+(i%3)*2
  local shape={{x,y},{x+2,y},{x+2,y-1},{x+w-2,y-1},{x+w-2,y},{x+w-1,y},{x+w-1,166},{x,166}}
  poly(far,shape,0x78677f);contour(far,shape,0x685d75)
- rect(far,x+3,y-5,room,5,0x685d75);rect(far,x+4,y-4,room-2,4,0x78677f)
+ rect(far,x+3,y-5,room,5,0x685d75);rect(far,x+4,y-4,room-2,3,0x78677f)
  if i%3==0 then
-  oval(far,x+w-8,y-7,5,6,0x685d75);rect(far,x+w-7,y-5,3,3,0x78677f)
+  rect(far,x+w-8,y-7,6,6,0x685d75);rect(far,x+w-7,y-6,4,4,0x78677f)
+  line(far,x+w-7,y-1,x+w-7,y,0x685d75);line(far,x+w-4,y-1,x+w-4,y,0x685d75)
  elseif i%4==0 then
   line(far,x+w-5,y-7,x+w-5,y-1,0x685d75);line(far,x+w-8,y-6,x+w-2,y-6,0x685d75)
  end
@@ -435,10 +436,10 @@ for i,b in ipairs(blocks) do local x,y,w=table.unpack(b)
  line(city,x,y+2,x+w-1,y+2,0x58516b)
  -- Rooftop stairwell with a small door, water tanks and balcony sunshades.
  if i%3==1 then
-  rect(city,x+3,y-6,8,6,0x58516b);rect(city,x+4,y-5,6,5,0x675d78);rect(city,x+7,y-3,2,3,0x59536c)
+  rect(city,x+3,y-6,8,6,0x58516b);rect(city,x+4,y-5,6,4,0x675d78);rect(city,x+7,y-3,2,2,0x59536c)
  elseif i%3==2 then
-  oval(city,x+w-9,y-7,6,6,0x58516b);rect(city,x+w-8,y-5,4,3,0x675d78)
-  line(city,x+w-8,y-1,x+w-8,y,0x58516b)
+  rect(city,x+w-9,y-7,7,6,0x58516b);rect(city,x+w-8,y-6,5,4,0x675d78)
+  line(city,x+w-8,y-1,x+w-8,y,0x58516b);line(city,x+w-4,y-1,x+w-4,y,0x58516b)
  end
  for wy=y+7,156,12 do
   rect(city,x+5,wy,3,4,0x59536c);rect(city,x+w-8,wy,3,4,0x59536c)

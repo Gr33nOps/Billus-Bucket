@@ -68,3 +68,7 @@ Restored blue-purple night sky, muted cool clouds and cool town shading, with a 
 Replaced rectangular lamp halos with a soft elliptical pixel falloff and rounded bulb fill that preserves the housing outline. HUD now uses the shared text shadow rather than the heavy eight-neighbour border. Added a third atmospheric sky tone for day/night. Reauthored background architecture with flat parapets, offset rooftop stair rooms, water tanks, antennas and shaded balconies, preserving the existing scenery palette and cable continuity. Pickup sound emphasizes paper rustle with a faint high note, removing the heavy metal hit and reducing peak level. Unrelated sound assets were preserved.
 
 Verified day/night captures, binary alpha and editable asset sources, character and bucket outline checks, zero-warning build, gameplay and difficulty tests.
+
+## Rooftop contour and pickup comfort follow-up (2026-11-02)
+
+Closed rooftop stair-room bottom borders and rebuilt water tanks with inset fills, continuous rectangular contours and two visible supports. Catch audio is now purely softened low-pass paper noise, with no high pitched tone or metal hit; peak reduced to .28. HUD retains the game's shared font/drop shadow with small dark translucent backing strips for daylight contrast. Verified day render, art source/alpha/outline checks, zero-warning build and gameplay/difficulty suite.

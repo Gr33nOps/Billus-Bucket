@@ -2154,6 +2154,10 @@ namespace BillusBucket
 
         private void DrawHudText(string text, Vector2 position, Color color)
         {
+            // A small recessed backing keeps the shared lettering readable in bright sky.
+            int width = PixelFont.Width(text, 1);
+            DrawRect((int)position.X - 1, (int)position.Y - 1, width + 3, PixelFont.Height + 3,
+                new Color(35, 36, 56) * .82f);
             DrawText(text, position, color, 1);
         }
 
