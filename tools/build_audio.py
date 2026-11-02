@@ -217,16 +217,23 @@ def compose_music():
 
 
 def compose_effects():
-    # A quiet paper tap: rounded attack, short decay, no tonal or airy tail.
-    pickup = silence(.075)
-    soft = 0.0
+    # Paper landing: compact cushioned contact, followed by a short folded-paper rustle.
+    # No metallic partials, sub-bass thump or long hiss.
+    pickup = silence(.14)
+    noise_low = 0.0
+    noise_mid = 0.0
     for i in range(len(pickup)):
         t = i / RATE
-        soft = .88 * soft + .12 * rng.uniform(-1, 1)
-        attack = min(1.0, t / .008)
-        tail = max(0.0, 1.0 - t / .075) ** 3
-        pickup[i] = soft * attack * tail
-    export("catch", pickup, .20)
+        noise = rng.uniform(-1, 1)
+        noise_low += .07 * (noise - noise_low)
+        noise_mid += .24 * (noise - noise_mid)
+        attack = min(1.0, t / .004)
+        contact = .22 * math.sin(TAU * 260 * t) * math.exp(-t * 85)
+        grain = (noise_mid - noise_low) * .7 * math.exp(-t * 65)
+        fold = noise_low * .6 * math.exp(-((t - .038) / .018) ** 2)
+        end_fade = min(1.0, max(0.0, (.14 - t) / .025))
+        pickup[i] = (contact + grain + fold) * attack * end_fade
+    export("catch", pickup, .44)
 
     cues = {
         "start": [(0, 62), (.085, 66), (.17, 69), (.29, 74)],

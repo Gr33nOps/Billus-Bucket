@@ -78,3 +78,7 @@ Closed rooftop stair-room bottom borders and rebuilt water tanks with inset fill
 Removed HUD backing strips. Shared glyphs use dark plum/green/brown faces with a pale offset shadow in daylight, blending to the original bright colours and dark shadow at night. Cycle is now 240 seconds: 120 daylight, 30 dusk, 60 night, 30 dawn; lamp timing updated. Catch audio changed to a quiet 75ms noise-based paper tap with rounded attack and short decay, no pitched tone or long airy tail. Sound wording was ambiguous; asked for clarification and proceeded with the gentle tap interpretation while awaiting a reply.
 
 Revised timing tests failed before the change and pass after; zero-warning Release build and gameplay/difficulty suite pass. Browser HUD/modal/movement audit has no page errors and daylight screenshot was visually checked. Desktop art capture stalled this time and was stopped; browser preview used instead.
+
+## Pickup impact revision (2026-11-02)
+
+Added a short cushioned 260Hz contact beneath a filtered paper fold, 140ms overall. Raised catch peak to .44 and runtime gain to .46; narrowed denomination pitch variation to +/- .12 octaves to avoid chirp/thud extremes. No metallic partials or long noise tail. Verified waveform endpoints, headroom including four overlapping pickups, duration, zero-warning Release build and gameplay suite. Created seven-value audio preview with an overlap sequence. No subjective listening claim: this environment does not provide auditory inspection.

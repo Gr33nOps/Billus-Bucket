@@ -134,7 +134,7 @@ namespace BillusBucket
                 SoundExplode => ExplosionSfxVolume,
                 SoundSad => .20f,
                 SoundToggle => .26f,
-                SoundCatch => .38f,
+                SoundCatch => .46f,
                 _ => DefaultSfxVolume
             };
             float clampedPitch = Math.Clamp(pitch, -1f, 1f);
@@ -157,17 +157,16 @@ namespace BillusBucket
 
         public static float PitchForNote(int value)
         {
-            // MonoGame pitch is measured in octaves. Use D, E, F#, G, A, B, D
-            // around the pickup's A tone, so adjacent values are audible steps.
+            // Small pitch steps distinguish values without turning paper into a chirp or thud.
             switch (value)
             {
-                case 10: return -7f / 12f;
-                case 20: return -5f / 12f;
-                case 50: return -3f / 12f;
-                case 100: return -2f / 12f;
-                case 500: return 0f;
-                case 1000: return 2f / 12f;
-                case 5000: return 5f / 12f;
+                case 10: return -.12f;
+                case 20: return -.08f;
+                case 50: return -.04f;
+                case 100: return 0f;
+                case 500: return .04f;
+                case 1000: return .08f;
+                case 5000: return .12f;
                 default: return 0f;
             }
         }
