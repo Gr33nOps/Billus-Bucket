@@ -2081,7 +2081,7 @@ namespace BillusBucket
             DrawRect(0, 0, 320, 180, new Color(17, 20, 39) * (night * .22f));
             float light = Math.Clamp((night - .25f) / .5f, 0f, 1f);
             // Brief ignition flicker during dusk; a steady bulb through the short night.
-            if (elapsed % 125f < 65f && light > 0f && light < 1f && (int)(elapsed * 9f) % 4 == 0)
+            if (elapsed % 240f < 150f && light > 0f && light < 1f && (int)(elapsed * 9f) % 4 == 0)
                 light *= .35f;
             // Elliptical falloff follows the hanging bulb; no rectangular halo bands.
             for (int y = 136; y <= 152; y++)
@@ -2154,11 +2154,14 @@ namespace BillusBucket
 
         private void DrawHudText(string text, Vector2 position, Color color)
         {
-            // A small recessed backing keeps the shared lettering readable in bright sky.
-            int width = PixelFont.Width(text, 1);
-            DrawRect((int)position.X - 1, (int)position.Y - 1, width + 3, PixelFont.Height + 3,
-                new Color(35, 36, 56) * .82f);
-            DrawText(text, position, color, 1);
+            float night = SkyMotion.NightAmount(elapsed);
+            // Dark ink in daylight, original warm colours at night; shared glyphs and shadow.
+            Color daylight = color == ScoreValueColor ? new Color(38, 69, 43)
+                : color == BestValueColor ? new Color(87, 54, 29) : TextShadowColor;
+            Color face = Color.Lerp(daylight, color, night);
+            Color shadow = Color.Lerp(new Color(197, 207, 192), TextShadowColor, night);
+            PixelFont.Draw(batch, pixel, text, position + new Vector2(0f, 1f), shadow, 1);
+            PixelFont.Draw(batch, pixel, text, position, face, 1);
         }
 
         private static string FitCompactRupeeAmount(BigInteger amount, int availableWidth)

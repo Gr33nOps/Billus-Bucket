@@ -217,11 +217,16 @@ def compose_music():
 
 
 def compose_effects():
-    # Soft low-pass paper rustle, with no pitched impact or metallic transient.
-    pickup = silence(.20)
-    mix(pickup, paper(.14), 0, .9)
-    mix(pickup, paper(.10), .065, .25)
-    export("catch", pickup, .28)
+    # A quiet paper tap: rounded attack, short decay, no tonal or airy tail.
+    pickup = silence(.075)
+    soft = 0.0
+    for i in range(len(pickup)):
+        t = i / RATE
+        soft = .88 * soft + .12 * rng.uniform(-1, 1)
+        attack = min(1.0, t / .008)
+        tail = max(0.0, 1.0 - t / .075) ** 3
+        pickup[i] = soft * attack * tail
+    export("catch", pickup, .20)
 
     cues = {
         "start": [(0, 62), (.085, 66), (.17, 69), (.29, 74)],

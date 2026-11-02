@@ -106,7 +106,7 @@ namespace BillusBucket
             BillusBucketRun run = new BillusBucketRun();
             BigInteger lastRunCash = BigInteger.Zero;
             float explosionTimer = 0f;
-            float ambientTime = artReviewIndex switch { 10 => 0f, 11 => 55f, 12 => 85f, 13 => 115f, _ => .6f };
+            float ambientTime = artReviewIndex switch { 10 => 0f, 11 => 135f, 12 => 180f, 13 => 225f, _ => .6f };
 
             if (artReviewIndex == 0)
             {

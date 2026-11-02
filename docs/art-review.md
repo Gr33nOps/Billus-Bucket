@@ -72,3 +72,9 @@ Verified day/night captures, binary alpha and editable asset sources, character 
 ## Rooftop contour and pickup comfort follow-up (2026-11-02)
 
 Closed rooftop stair-room bottom borders and rebuilt water tanks with inset fills, continuous rectangular contours and two visible supports. Catch audio is now purely softened low-pass paper noise, with no high pitched tone or metal hit; peak reduced to .28. HUD retains the game's shared font/drop shadow with small dark translucent backing strips for daylight contrast. Verified day render, art source/alpha/outline checks, zero-warning build and gameplay/difficulty suite.
+
+## Unboxed HUD and slower cycle (2026-11-02)
+
+Removed HUD backing strips. Shared glyphs use dark plum/green/brown faces with a pale offset shadow in daylight, blending to the original bright colours and dark shadow at night. Cycle is now 240 seconds: 120 daylight, 30 dusk, 60 night, 30 dawn; lamp timing updated. Catch audio changed to a quiet 75ms noise-based paper tap with rounded attack and short decay, no pitched tone or long airy tail. Sound wording was ambiguous; asked for clarification and proceeded with the gentle tap interpretation while awaiting a reply.
+
+Revised timing tests failed before the change and pass after; zero-warning Release build and gameplay/difficulty suite pass. Browser HUD/modal/movement audit has no page errors and daylight screenshot was visually checked. Desktop art capture stalled this time and was stopped; browser preview used instead.

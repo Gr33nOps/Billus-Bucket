@@ -7,9 +7,9 @@ namespace BillusBucket
         public static float NightAmount(float seconds)
         {
             if (!float.IsFinite(seconds) || seconds <= 0f) return 0f;
-            float phase = seconds % 125f;
-            float amount = phase < 45f ? 0f : phase < 65f ? (phase - 45f) / 20f
-                : phase < 105f ? 1f : (125f - phase) / 20f;
+            float phase = seconds % 240f;
+            float amount = phase < 120f ? 0f : phase < 150f ? (phase - 120f) / 30f
+                : phase < 210f ? 1f : (240f - phase) / 30f;
             return amount * amount * (3f - 2f * amount);
         }
         public static float CloudX(float seconds, float start, float speed) =>
