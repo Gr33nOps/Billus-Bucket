@@ -49,9 +49,9 @@ namespace BillusBucket
             "catch-impact",
             "bucket-full",
             "day",
-            "dusk",
-            "night",
-            "dawn",
+            "day-later",
+            "day-clouds",
+            "day-wrapped",
             "single-note"
         };
 

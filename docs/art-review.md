@@ -45,3 +45,10 @@ Outline follow-up: closed exposed rim-highlight pixels in the authored bucket (a
 - Split scenery and clouds into authored transparent assets. A 180-second day/night cycle blends the sky and town palette, with dusk colour, a small crescent and sparse stars at night. The left lamp fades/flickers on at dusk and off at dawn. Three clouds drift right at different gentle speeds behind the town; three small flapping birds cross the upper daylight sky.
 - Environment motion follows the existing ambient clock and freezes with pause. Render coordinates remain integer native pixels, with point sampling and no collision changes.
 - Verification: Release solution build with warnings as errors; gameplay/platform/leaderboard checks and 100 seeded difficulty runs; PNG/outline/source checks; deterministic day/dusk/night/dawn and single-note captures; local Chromium desktop lifecycle and three mobile landscape viewport checks.
+
+## Daylight-only follow-up (2026-11-02)
+
+- Removed the day/night cycle, moon, stars, birds and lamp switching; the daylight palette remains constant.
+- Render the sky/cloud layer directly at display resolution behind the transparent native game canvas. Slow fractional cloud positions now move in screen-pixel increments instead of jumping a whole scaled game pixel; point sampling preserves the authored shapes. Scissor clipping keeps clouds within the play viewport. Diagnostic native captures still include the sky.
+- Removed the cash spawn director's persistent directional lane. Each note now chooses an independent spawn position; existing independent per-note flutter/momentum and soft boundary handling are preserved.
+- Verified the spawn regression fails before the change, then passes; Release build has zero warnings/errors, gameplay/difficulty tests pass. Browser screenshots show 1px cloud movement at 4x game scale. Pause freezes the scene; three mobile landscape sizes still fit; no browser errors.

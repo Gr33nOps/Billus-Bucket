@@ -32,7 +32,7 @@
   <ItemGroup>
     <!-- WebAssembly host files -->
     <Compile Include="Program.cs" />
-    <Compile Include="..\BillusBucket\Gameplay\SkyCycle.cs" Link="Shared\Gameplay\SkyCycle.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\SkyMotion.cs" Link="Shared\Gameplay\SkyMotion.cs" />
     <Compile Include="Pages\Index.razor.cs" />
     <Compile Include="Platform\BrowserPlatformInterop.cs" />
 

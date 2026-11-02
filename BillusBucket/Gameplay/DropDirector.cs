@@ -33,10 +33,7 @@ namespace BillusBucket
 
         private const double BaseBombChance = 0.30;
         private const double MaxExtraBombChance = 0.30;
-        private const double DirectionFlipChance = 0.18;
 
-        private const float MinCashStep = 12f;
-        private const float CashStepRange = 22f;
 
         private const float BaseBombSpeed = 68f;
         private const float MaxExtraBombSpeed = 52f;
@@ -45,8 +42,6 @@ namespace BillusBucket
 
         private readonly Random random;
         private float lastBombTime = -100f;
-        private float cashX = float.NaN;
-        private int cashDirection = 1;
 
         public DropDirector(int? seed = null)
         {
@@ -97,26 +92,8 @@ namespace BillusBucket
             }
             else
             {
-                if (float.IsNaN(cashX))
-                {
-                    cashX = (leftBound + rightBound) / 2f;
-                }
-
-                if (random.NextDouble() < DirectionFlipChance)
-                {
-                    cashDirection = -cashDirection;
-                }
-
-                float step = MinCashStep + (float)random.NextDouble() * CashStepRange;
-                cashX += cashDirection * step;
-
-                if (cashX < leftBound || cashX > rightBound)
-                {
-                    cashDirection = -cashDirection;
-                    cashX = Math.Clamp(cashX, leftBound, rightBound);
-                }
-
-                spawnX = cashX;
+                // Each paper starts independently; no shared left/right travelling lane.
+                spawnX = leftBound + (float)random.NextDouble() * (rightBound - leftBound);
             }
 
             float baseDelay = 0.59f - pressure * 0.32f + restAmount * 0.17f;

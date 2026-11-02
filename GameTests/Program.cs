@@ -21,12 +21,13 @@ namespace GameTests
             TestRunScoring();
             TestCashFormatting();
             TestDropDirector();
+            TestIndependentCashSpawns();
             TestRoundFlow();
             TestRoundFlowLeaderboardRules();
             TestBilluAnimator();
             TestDropMotion();
             TestBucketFeedback();
-            TestSkyCycle();
+            TestSkyMotion();
 
             TestBucketControl();
             TestLeaderboardStore();
@@ -390,16 +391,26 @@ namespace GameTests
             Equal(0, feedback.ImpactOffset, "reset clears catch movement");
         }
 
-        private static void TestSkyCycle()
+        private static void TestIndependentCashSpawns()
         {
-            Equal(true, SkyCycle.Night(0f) < .01f, "cycle begins in daylight");
-            Equal(true, SkyCycle.Night(90f) > .99f, "cycle reaches night");
-            Equal(true, SkyCycle.Night(180f) < .01f, "cycle returns to day");
-            for (int i = 1; i < 1800; i++)
-                Equal(true, Math.Abs(SkyCycle.Night(i / 10f) - SkyCycle.Night((i - 1) / 10f)) < .01f,
-                    "lighting changes gradually without abrupt switches");
-            Equal(true, SkyCycle.CloudX(10f, 100f, 1f) > SkyCycle.CloudX(0f, 100f, 1f), "clouds drift right");
-            Equal(true, SkyCycle.CloudX(250f, 100f, 1f) < 0f, "cloud wraps outside view");
+            var director = new DropDirector(724);
+            double products = 0, squares = 0;
+            float previous = director.Next(0f, 66f, 252f).X - 159f;
+            for (int i = 0; i < 4000; i++)
+            {
+                float current = director.Next(0f, 66f, 252f).X - 159f;
+                products += previous * current;
+                squares += previous * previous;
+                previous = current;
+            }
+            Equal(true, Math.Abs(products / squares) < .1,
+                "new notes do not inherit a travelling spawn lane from previous notes");
+        }
+
+        private static void TestSkyMotion()
+        {
+            Equal(true, SkyMotion.CloudX(10f, 100f, 1f) > SkyMotion.CloudX(0f, 100f, 1f), "clouds drift right");
+            Equal(true, SkyMotion.CloudX(250f, 100f, 1f) < 0f, "cloud wraps outside view");
         }
 
         private static void TestDropMotion()
