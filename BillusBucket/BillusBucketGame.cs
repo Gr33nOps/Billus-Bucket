@@ -2154,14 +2154,7 @@ namespace BillusBucket
 
         private void DrawHudText(string text, Vector2 position, Color color)
         {
-            float night = SkyMotion.NightAmount(elapsed);
-            // Dark ink in daylight, original warm colours at night; shared glyphs and shadow.
-            Color daylight = color == ScoreValueColor ? new Color(38, 69, 43)
-                : color == BestValueColor ? new Color(87, 54, 29) : TextShadowColor;
-            Color face = Color.Lerp(daylight, color, night);
-            Color shadow = Color.Lerp(new Color(197, 207, 192), TextShadowColor, night);
-            PixelFont.Draw(batch, pixel, text, position + new Vector2(0f, 1f), shadow, 1);
-            PixelFont.Draw(batch, pixel, text, position, face, 1);
+            DrawText(text, position, color, 1);
         }
 
         private static string FitCompactRupeeAmount(BigInteger amount, int availableWidth)
