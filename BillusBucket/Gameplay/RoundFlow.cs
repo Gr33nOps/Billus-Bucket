@@ -1,5 +1,6 @@
 namespace BillusBucket
 {
+    // Only one of these screens is active at a time.
     public enum RoundPhase
     {
         Ready,
@@ -8,6 +9,7 @@ namespace BillusBucket
         GameOver
     }
 
+    // A menu click asks the game to start a fresh run or resume an existing one.
     public enum RoundAction
     {
         None,
@@ -15,6 +17,7 @@ namespace BillusBucket
         Resume
     }
 
+    // A rectangle used for input hit-testing in the 320 by 180 game coordinates.
     public readonly struct ButtonBounds
     {
         public int X { get; }
@@ -32,8 +35,7 @@ namespace BillusBucket
 
         public bool Contains(int x, int y)
         {
-            return x >= X && x < X + Width &&
-                   y >= Y && y < Y + Height;
+            return x >= X && x < X + Width && y >= Y && y < Y + Height;
         }
     }
 
@@ -44,10 +46,8 @@ namespace BillusBucket
     public sealed class RoundFlow
     {
         public static readonly ButtonBounds TopRightLeaderboardButton = new ButtonBounds(292, 71, 20, 16);
-
         private static readonly ButtonBounds CenterMenuButton = new ButtonBounds(126, 85, 68, 18);
         private static readonly ButtonBounds LeaderboardBackButton = new ButtonBounds(130, 147, 60, 18);
-
         public RoundPhase Phase { get; private set; } = RoundPhase.Ready;
         public bool IsLeaderboardOpen { get; private set; }
 

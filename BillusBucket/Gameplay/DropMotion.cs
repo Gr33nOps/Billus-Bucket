@@ -16,11 +16,9 @@ namespace BillusBucket
     {
         private const int FrameCount = 4;
         private const float BombFrameRate = 7f;
-
         private readonly float startX;
         private readonly float startY;
         private readonly float speed;
-
         private readonly float phase;
         private readonly float frequency;
         private readonly float driftPeriod;
@@ -32,8 +30,9 @@ namespace BillusBucket
         private int windSteps;
         private float windX;
         private float windVelocity;
-        private const float WindStep = 1f / 120f;
 
+        // Simulate sideways motion in equal steps, regardless of the display's frame rate.
+        private const float WindStep = 1f / 120f;
         public DropKind Kind { get; }
         public float X { get; private set; }
         public float Y { get; private set; }
@@ -69,19 +68,33 @@ namespace BillusBucket
             Y = y;
             this.speed = speed;
 
+            // A seed makes this path repeatable in tests. Each live note gets its own breeze.
             Random random = seed.HasValue ? new Random(seed.Value) : Random.Shared;
             phase = (float)random.NextDouble() * MathF.PI * 2f;
             frequency = 1.5f + (float)random.NextDouble() * 1.7f;
             driftPeriod = .9f + (float)random.NextDouble() * .65f;
             windSeed = (uint)random.Next();
+
             // A soft wind corridor keeps paper within reach and inside the sprite margins.
             driftLeft = Math.Max(x - 88f, left);
             driftRight = Math.Min(x + 88f, right);
-            if (driftRight < driftLeft) driftRight = driftLeft;
+            if (driftRight < driftLeft)
+            {
+                driftRight = driftLeft;
+            }
+
             windX = Math.Clamp(x, driftLeft, driftRight);
             windVelocity = WindVelocity(0);
-            if (windX - driftLeft < 20f) windVelocity = Math.Abs(windVelocity);
-            if (driftRight - windX < 20f) windVelocity = -Math.Abs(windVelocity);
+            if (windX - driftLeft < 20f)
+            {
+                windVelocity = Math.Abs(windVelocity);
+            }
+
+            if (driftRight - windX < 20f)
+            {
+                windVelocity = -Math.Abs(windVelocity);
+            }
+
             flutterRate = 4f + (float)random.NextDouble() * 6f;
         }
 
@@ -94,7 +107,6 @@ namespace BillusBucket
 
             motionAge += seconds;
             Age = (float)motionAge;
-
             if (Kind == DropKind.Bomb)
             {
                 X = startX;
@@ -111,17 +123,21 @@ namespace BillusBucket
             {
                 float time = windSteps * WindStep;
                 float desired = WindVelocity((int)(time / driftPeriod));
+
+                // Near an edge, push the note gently back inward rather than snapping it around.
                 float leftPressure = Math.Clamp((30f - (windX - driftLeft)) / 30f, 0f, 1f);
                 float rightPressure = Math.Clamp((30f - (driftRight - windX)) / 30f, 0f, 1f);
                 desired += 85f * (leftPressure * leftPressure - rightPressure * rightPressure);
+
+                // Close part of the gap to the desired speed each step, preserving momentum.
                 windVelocity += (desired - windVelocity) * (2.6f * WindStep);
                 windX += windVelocity * WindStep;
                 windSteps++;
             }
+
             float remainder = Math.Max(0f, (float)(windAge - windSteps / 120d));
             X = Math.Clamp(windX + windVelocity * remainder, driftLeft, driftRight);
-            Rotation = Math.Clamp(windVelocity / 95f, -.45f, .45f)
-                     + .14f * MathF.Sin(Age * frequency * 1.7f + phase);
+            Rotation = Math.Clamp(windVelocity / 95f, -.45f, .45f) + .14f * MathF.Sin(Age * frequency * 1.7f + phase);
 
             // Compute Y directly from Age so fall distance stays identical at any frame rate.
             float verticalFlutter = (0.12f / frequency) * (MathF.Sin(Age * frequency + phase) - MathF.Sin(phase));
@@ -130,6 +146,9 @@ namespace BillusBucket
 
         private float WindVelocity(int index)
         {
+            // This hash turns the note's seed and breeze number into repeatable random bits.
+            // It never changes another note's state or consumes a shared random sequence.
+            // unchecked deliberately allows integer wraparound during the hash calculation.
             // Each breeze chooses a direction independently; it can keep
             // carrying the note the same way or ease it into a turn.
             uint value;
@@ -140,6 +159,7 @@ namespace BillusBucket
                 value = (value ^ (value >> 15)) * 0x846ca68bu;
                 value ^= value >> 16;
             }
+
             float roll = (value >> 8) / 16777215f;
             return (value % 2 == 0 ? -1f : 1f) * (24f + roll * 18f);
         }

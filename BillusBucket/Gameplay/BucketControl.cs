@@ -8,15 +8,16 @@ namespace BillusBucket
     /// </summary>
     public sealed class BucketControl
     {
+        // Speed is pixels per second; acceleration is how quickly that speed changes.
         private const float MaxSpeed = 135f;
         private const float Acceleration = 450f;
         private const float TurnAcceleration = 875f;
         private const float Braking = 400f;
         private const float MaxPhysicsStep = 1f / 60f;
-
         private readonly float minX;
         private readonly float maxX;
 
+        // X is the bucket's center, not its left edge. Positive velocity moves right.
         public float X { get; private set; }
         public float VelocityX { get; private set; }
         public int Facing { get; private set; } = 1;
@@ -26,7 +27,6 @@ namespace BillusBucket
         {
             float leftLimit = playfieldLeft + bucketWidth / 2f;
             float rightLimit = playfieldLeft + playfieldWidth - bucketWidth / 2f;
-
             if (rightLimit < leftLimit)
             {
                 float center = playfieldLeft + playfieldWidth / 2f;
@@ -42,6 +42,7 @@ namespace BillusBucket
             X = Math.Clamp(startX, minX, maxX);
         }
 
+        // direction is -1, 0, or +1. A non-null pointerX takes priority over the keyboard.
         public void Update(float seconds, int direction, float? pointerX)
         {
             if (!float.IsFinite(seconds) || seconds <= 0f)
@@ -71,7 +72,6 @@ namespace BillusBucket
         private void Step(float seconds, int direction, float? targetX)
         {
             float desiredSpeed = direction * MaxSpeed;
-
             if (targetX.HasValue)
             {
                 float distance = targetX.Value - X;
@@ -103,8 +103,9 @@ namespace BillusBucket
 
             float previousVelocity = VelocityX;
             VelocityX = MoveToward(VelocityX, desiredSpeed, accelerationRate * seconds);
-
             float previousX = X;
+
+            // Average the old and new speeds so acceleration also affects this step's distance.
             float averageVelocity = (previousVelocity + VelocityX) * 0.5f;
             X = Math.Clamp(X + averageVelocity * seconds, minX, maxX);
 

@@ -9,10 +9,7 @@ namespace BillusBucket
     {
         public DropMotion Motion { get; }
         public int NoteIndex { get; }
-
-        public int Value => Motion.Kind == DropKind.Cash
-            ? NoteCatalog.ValueAt(NoteIndex)
-            : 0;
+        public int Value => Motion.Kind == DropKind.Cash ? NoteCatalog.ValueAt(NoteIndex) : 0;
 
         public Drop(DropMotion motion, int noteIndex = 0)
         {

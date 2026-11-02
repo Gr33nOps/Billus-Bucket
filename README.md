@@ -6,6 +6,18 @@ A crisp `320×180` pixel-art rooftop arcade game built with C# and MonoGame (Des
 
 Guide Billu across the rooftop to catch floating rupee notes (`Rs 10` to `Rs 5,000`) in his bucket while dodging falling bombs.
 
+## Learn the game code
+
+Start with the [beginner guide](docs/learning-the-game.md). It gives a reading order, a folder map, a walkthrough of one gameplay frame, and explanations of the C# syntax used here.
+
+The main loop is in [BillusBucketGame.cs](BillusBucket/BillusBucketGame.cs), and active gameplay is in [Game/Playing.cs](BillusBucket/Game/Playing.cs). Movement, falling objects, scoring, and animation each have a smaller file under `Gameplay/`. Drawing lives under `Presentation/`.
+
+To play locally while learning:
+
+```powershell
+dotnet run --project BillusBucket
+```
+
 ## Controls
 
 - **Move**: `Left` / `Right`, `A` / `D`, mouse drag, or mobile touch drag
@@ -17,11 +29,15 @@ Guide Billu across the rooftop to catch floating rupee notes (`Rs 10` to `Rs 5,0
 
 ## Project Structure
 
-- `BillusBucket/` — Core C# gameplay, presentation, audio, platform abstractions, modular leaderboards, and DesktopGL target (`net8.0`)
+- `BillusBucket/Game/` — Active gameplay, input helpers, and content loading for the main game class
+- `BillusBucket/Gameplay/` — Movement, spawns, falling objects, catch detection, scoring, and animation
+- `BillusBucket/Presentation/` — World and menu drawing, pixel font, and visual effects
+- `BillusBucket/Audio/` and `Assets/` — Sound playback and the game art/audio files
+- `BillusBucket/Leaderboards/`, `Persistence/`, and `Platform/` — Online scores, saves, and desktop/browser support
 - `BillusBucket.Web/` — HTML5 / WebAssembly browser target using KNI BlazorGL (`net9.0`) + JS bridge for CrazyGames SDK v3, Poki SDK v2, and safe `localStorage`
 - `GameTests/` — Automated unit tests for gameplay physics, scoring, leaderboard adapters, platform policies, and 100-seed 5-minute difficulty checks
-- `backend/cloudflare/` � Active Workers + D1 weekly leaderboard, custom names, Save Code profiles, schema and migrations
-- `tools/deploy_cloudflare_leaderboard.ps1` � Cloudflare provisioning and migration/deployment helper
+- `backend/cloudflare/` — Active Workers + D1 weekly leaderboard, custom names, Save Code profiles, schema and migrations
+- `tools/deploy_cloudflare_leaderboard.ps1` — Cloudflare provisioning and migration/deployment helper
 - `backend/supabase/` — Optional shared weekly Top-10 leaderboard Postgres schema (`schema.sql`) and Edge Function (`functions/leaderboard/index.ts`)
 - `tools/publish_web.ps1` — Builds portal-specific static WebAssembly bundles (`local`, `web`, `crazygames`, `poki`)
 - `docs/browser-and-leaderboards.md` — Full guide for platform configuration, optional Supabase setup, security risks, and CrazyGames/Poki submission checklists

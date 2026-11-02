@@ -38,6 +38,15 @@
 
     <!-- Shared Billu's Bucket C# gameplay, presentation, audio, and leaderboard source -->
     <Compile Include="..\BillusBucket\BillusBucketGame.cs" Link="Shared\BillusBucketGame.cs" />
+    <!-- Other parts of the same game class; both targets share all gameplay code. -->
+    <Compile Include="..\BillusBucket\Game\Content.cs" Link="Shared\Game\Content.cs" />
+    <Compile Include="..\BillusBucket\Game\Input.cs" Link="Shared\Game\Input.cs" />
+    <Compile Include="..\BillusBucket\Game\Playing.cs" Link="Shared\Game\Playing.cs" />
+    <Compile Include="..\BillusBucket\Presentation\WorldDrawing.cs" Link="Shared\Presentation\WorldDrawing.cs" />
+    <Compile Include="..\BillusBucket\Presentation\InterfaceDrawing.cs" Link="Shared\Presentation\InterfaceDrawing.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\GameScores.cs" Link="Shared\Leaderboards\GameScores.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\Screens\LeaderboardInput.cs" Link="Shared\Leaderboards\Screens\LeaderboardInput.cs" />
+    <Compile Include="..\BillusBucket\Leaderboards\Screens\LeaderboardDrawing.cs" Link="Shared\Leaderboards\Screens\LeaderboardDrawing.cs" />
     <Compile Include="..\BillusBucket\Audio\GameAudio.cs" Link="Shared\Audio\GameAudio.cs" />
     <Compile Include="..\BillusBucket\Diagnostics\ReviewTools.cs" Link="Shared\Diagnostics\ReviewTools.cs" />
     <Compile Include="..\BillusBucket\Gameplay\BilluAnimator.cs" Link="Shared\Gameplay\BilluAnimator.cs" />

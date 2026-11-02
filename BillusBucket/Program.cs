@@ -28,7 +28,10 @@ namespace BillusBucket
                 }
             }
 
+            // Create one game. "using" disposes it when Run finishes and the app closes.
             using BillusBucketGame game = new BillusBucketGame(artReviewDirectory, liveReviewDirectory);
+
+            // MonoGame now calls Initialize, LoadContent, Update, and Draw for us.
             game.Run();
         }
     }

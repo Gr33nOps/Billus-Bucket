@@ -18,15 +18,38 @@ namespace BillusBucket
         private const float WalkSpeedThreshold = 1f;
         private const float WalkFrameDuration = 0.11f;
         private const int WalkFrameCount = 4;
-
         private float stateTime;
         private float blinkTime;
-
         public BilluAction Action { get; private set; } = BilluAction.Straight;
 
-        public int SpriteFrame => (Action == BilluAction.WalkLeft ? 8 + Frame
-            : Action == BilluAction.WalkRight ? 4 + Frame : 0)
-            + (blinkTime >= 3.2f && blinkTime < 3.34f ? 12 : 0);
+        public int SpriteFrame
+        {
+            get
+            {
+                // Columns 0..3 are straight, 4..7 right, and 8..11 left.
+                int spriteFrame;
+                if (Action == BilluAction.WalkLeft)
+                {
+                    spriteFrame = 8 + Frame;
+                }
+                else if (Action == BilluAction.WalkRight)
+                {
+                    spriteFrame = 4 + Frame;
+                }
+                else
+                {
+                    spriteFrame = 0;
+                }
+
+                // The next 12 columns repeat those poses with closed eyes.
+                if (blinkTime >= 3.2f && blinkTime < 3.34f)
+                {
+                    spriteFrame += 12;
+                }
+
+                return spriteFrame;
+            }
+        }
 
         public int Frame
         {

@@ -2,6 +2,7 @@ using System;
 
 namespace BillusBucket
 {
+    /// <summary>A spawn instruction: object type, horizontal position, fall speed, and next delay.</summary>
     public readonly struct DropPlan
     {
         public DropKind Kind { get; }
@@ -30,16 +31,12 @@ namespace BillusBucket
         private const float BreatherStartSeconds = 13f;
         private const float BreatherDurationSeconds = 3f;
         private const float MinimumBombGap = 0.62f;
-
         private const double BaseBombChance = 0.30;
         private const double MaxExtraBombChance = 0.30;
-
-
         private const float BaseBombSpeed = 68f;
         private const float MaxExtraBombSpeed = 52f;
         private const float BaseCashSpeed = 32f;
         private const float MaxExtraCashSpeed = 22f;
-
         private readonly Random random;
         private float lastBombTime = -100f;
 
@@ -57,9 +54,10 @@ namespace BillusBucket
                 rightBound = swap;
             }
 
+            // First let the player settle in, then gradually increase the pressure.
+            // Exp produces a curve that approaches its limit rather than growing forever.
             float activeSeconds = Math.Max(0f, elapsedSeconds - WarmupSeconds);
-            float difficultyRamp = .78f * (1f - MathF.Exp(-activeSeconds / RampSeconds))
-                + .22f * (1f - MathF.Exp(-activeSeconds / 150f));
+            float difficultyRamp = .78f * (1f - MathF.Exp(-activeSeconds / RampSeconds)) + .22f * (1f - MathF.Exp(-activeSeconds / 150f));
             float phraseTime = activeSeconds % PhraseSeconds;
 
             // Every 16-second cycle ends with a 3-second breather so the pace stays fair.
@@ -71,24 +69,19 @@ namespace BillusBucket
             }
 
             float pressure = difficultyRamp * (1f - restAmount * 0.42f);
-
-            bool canSpawnBomb =
-                elapsedSeconds >= WarmupSeconds &&
-                restAmount < 0.85f &&
-                elapsedSeconds - lastBombTime >= 1.15f - difficultyRamp * (1.15f - MinimumBombGap);
-
-            bool isBomb = canSpawnBomb &&
-                random.NextDouble() < BaseBombChance + pressure * MaxExtraBombChance;
-
+            bool canSpawnBomb = elapsedSeconds >= WarmupSeconds && restAmount < 0.85f && elapsedSeconds - lastBombTime >= 1.15f - difficultyRamp * (1.15f - MinimumBombGap);
+            bool isBomb = canSpawnBomb && random.NextDouble() < BaseBombChance + pressure * MaxExtraBombChance;
             float spawnX;
             if (isBomb)
             {
                 lastBombTime = elapsedSeconds;
                 spawnX = leftBound + (float)random.NextDouble() * (rightBound - leftBound);
+
                 // Aim at the position at spawn time only; bombs never home in.
                 if (playerX.HasValue && float.IsFinite(playerX.Value) && random.NextDouble() < .60)
-                    spawnX = Math.Clamp(playerX.Value + ((float)random.NextDouble() * 2f - 1f) * 48f,
-                        leftBound, rightBound);
+                {
+                    spawnX = Math.Clamp(playerX.Value + ((float)random.NextDouble() * 2f - 1f) * 48f, leftBound, rightBound);
+                }
             }
             else
             {
@@ -96,15 +89,12 @@ namespace BillusBucket
                 spawnX = leftBound + (float)random.NextDouble() * (rightBound - leftBound);
             }
 
+            // Smaller delays mean more objects. Jitter keeps the rhythm from feeling mechanical.
             float baseDelay = 0.59f - pressure * 0.32f + restAmount * 0.17f;
             float delayJitter = 0.94f + (float)random.NextDouble() * 0.12f;
             float nextDelay = baseDelay * delayJitter;
-
             DropKind kind = isBomb ? DropKind.Bomb : DropKind.Cash;
-            float speed = isBomb
-                ? BaseBombSpeed + pressure * MaxExtraBombSpeed
-                : BaseCashSpeed + pressure * MaxExtraCashSpeed;
-
+            float speed = isBomb ? BaseBombSpeed + pressure * MaxExtraBombSpeed : BaseCashSpeed + pressure * MaxExtraCashSpeed;
             return new DropPlan(kind, spawnX, speed, nextDelay);
         }
     }

@@ -12,11 +12,28 @@ namespace BillusBucket
         public const int FramesPerNote = 4;
 
         // Values in Pakistani Rupees (Rs 10 up to Rs 5,000).
-        private static readonly int[] Values = { 10, 20, 50, 100, 500, 1000, 5000 };
+        private static readonly int[] Values =
+        {
+            10,
+            20,
+            50,
+            100,
+            500,
+            1000,
+            5000
+        };
 
         // Spawn weights out of 1000 (25%, 23%, 20%, 17%, 9%, 5%, 1%).
-        private static readonly int[] Weights = { 250, 230, 200, 170, 90, 50, 10 };
-
+        private static readonly int[] Weights =
+        {
+            250,
+            230,
+            200,
+            170,
+            90,
+            50,
+            10
+        };
         public static int Count => Values.Length;
 
         public static int ValueAt(int index)
