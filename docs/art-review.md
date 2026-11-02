@@ -62,3 +62,9 @@ Verified cycle timing/continuity tests, zero-warning Release build, full gamepla
 ## Fuller night palette and duration (2026-11-02)
 
 Restored blue-purple night sky, muted cool clouds and cool town shading, with a lighter 22% world veil to unify the character, notes and effects. No celestial objects or birds. Extended the run cycle to 125 seconds: 45 daylight, 20 dusk, 40 full night, 20 dawn. Lamp ignition follows the new dusk timing. Run resets and pause behavior remain tied to elapsed gameplay time. Verified revised timing regression fails before the change, passes after; zero-warning solution build, gameplay/difficulty tests and rendered night/dusk/dawn previews passed.
+
+## Neighbourhood art, lamp and pickup polish (2026-11-02)
+
+Replaced rectangular lamp halos with a soft elliptical pixel falloff and rounded bulb fill that preserves the housing outline. HUD now uses the shared text shadow rather than the heavy eight-neighbour border. Added a third atmospheric sky tone for day/night. Reauthored background architecture with flat parapets, offset rooftop stair rooms, water tanks, antennas and shaded balconies, preserving the existing scenery palette and cable continuity. Pickup sound emphasizes paper rustle with a faint high note, removing the heavy metal hit and reducing peak level. Unrelated sound assets were preserved.
+
+Verified day/night captures, binary alpha and editable asset sources, character and bucket outline checks, zero-warning build, gameplay and difficulty tests.

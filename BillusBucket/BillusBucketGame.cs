@@ -1896,8 +1896,13 @@ namespace BillusBucket
             Color bottom = Color.Lerp(new Color(218, 191, 162), new Color(76, 61, 90), night);
             float dusk = 4f * night * (1f - night);
             bottom = Color.Lerp(bottom, new Color(180, 124, 137), dusk * .4f);
+            Color middle = Color.Lerp(new Color(149, 177, 188), new Color(53, 46, 79), night);
             for (int y = 0; y < 180; y++)
-                batch.Draw(pixel, new Rectangle(0, y, 320, 1), Color.Lerp(top, bottom, (y / 6) / 29f));
+            {
+                Color band = y < 72 ? Color.Lerp(top, middle, (y / 6) / 12f)
+                    : Color.Lerp(middle, bottom, ((y - 72) / 6) / 17f);
+                batch.Draw(pixel, new Rectangle(0, y, 320, 1), band);
+            }
 
             for (int i = 0; i < CloudShapes.Length; i++)
             {
@@ -2078,20 +2083,31 @@ namespace BillusBucket
             // Brief ignition flicker during dusk; a steady bulb through the short night.
             if (elapsed % 125f < 65f && light > 0f && light < 1f && (int)(elapsed * 9f) % 4 == 0)
                 light *= .35f;
-            DrawRect(23, 138, 11, 15, new Color(240, 166, 80) * (.10f * light));
-            DrawRect(25, 140, 7, 11, new Color(240, 166, 80) * (.14f * light));
-            DrawRect(26, 141, 5, 6, new Color(204, 133, 66) * light);
+            // Elliptical falloff follows the hanging bulb; no rectangular halo bands.
+            for (int y = 136; y <= 152; y++)
+                for (int x = 21; x <= 35; x++)
+                {
+                    float dx = (x - 28f) / 7f, dy = (y - 144f) / 8f;
+                    float falloff = Math.Max(0f, 1f - dx * dx - dy * dy);
+                    DrawRect(x, y, 1, 1, new Color(240, 166, 80) * (falloff * falloff * .23f * light));
+                }
+            // Keep the original oval housing and its dark outline visible.
+            for (int y = 141; y <= 146; y++)
+            {
+                int inset = y == 141 || y == 146 ? 1 : 0;
+                DrawRect(26 + inset, y, 5 - inset * 2, 1, new Color(204, 133, 66) * light);
+            }
             DrawRect(27, 142, 3, 4, new Color(239, 195, 105) * light);
             DrawRect(28, 142, 1, 2, new Color(255, 235, 168) * light);
         }
 
         private void DrawHud()
         {
-            DrawHudText("SCORE", new Vector2(4f, 8f), new Color(241, 227, 207));
+            DrawHudText("SCORE", new Vector2(4f, 8f), WarmTitleColor);
             BigInteger visibleScore = CurrentPhase == RoundPhase.GameOver ? lastRunCash : run.Cash;
             DrawHudAmount(visibleScore, 19, ScoreValueColor);
 
-            DrawHudText("BEST", new Vector2(4f, 34f), new Color(241, 227, 207));
+            DrawHudText("BEST", new Vector2(4f, 34f), WarmTitleColor);
             BigInteger bestScore = GetCurrentBestScore();
             DrawHudAmount(bestScore, 45, BestValueColor);
 
@@ -2138,12 +2154,7 @@ namespace BillusBucket
 
         private void DrawHudText(string text, Vector2 position, Color color)
         {
-            // A closed one-pixel outline preserves the coloured counters in bright daylight.
-            for (int y = -1; y <= 1; y++)
-                for (int x = -1; x <= 1; x++)
-                    if (x != 0 || y != 0)
-                        PixelFont.Draw(batch, pixel, text, position + new Vector2(x, y), TextShadowColor, 1);
-            PixelFont.Draw(batch, pixel, text, position, color, 1);
+            DrawText(text, position, color, 1);
         }
 
         private static string FitCompactRupeeAmount(BigInteger amount, int availableWidth)

@@ -417,15 +417,37 @@ saveFrames('sky-clouds',{clouds},320,180)
 -- Muted dusk: no sun or stars.
 local far=img(320,180);local city=img(320,180)
 local buildings={{0,128,19},{19,116,16},{35,125,21},{56,112,16},{72,130,22},{94,121,19},{113,110,17},{130,128,21},{151,118,24},{175,127,15},{190,108,18},{208,124,23},{231,114,16},{247,123,24},{271,108,18},{289,119,18},{307,125,13}}
-for _,b in ipairs(buildings) do local x,y,w=table.unpack(b)
- local shape={{x,y},{x+3,y},{x+3,y-3},{x+w-4,y-3},{x+w-4,y},{x+w-1,y},{x+w-1,166},{x,166}}
+for i,b in ipairs(buildings) do local x,y,w=table.unpack(b)
+ -- Flat parapets and offset rooftop rooms, rather than repeated tower crowns.
+ local room=4+(i%3)*2
+ local shape={{x,y},{x+2,y},{x+2,y-1},{x+w-2,y-1},{x+w-2,y},{x+w-1,y},{x+w-1,166},{x,166}}
  poly(far,shape,0x78677f);contour(far,shape,0x685d75)
- line(far,x+w-6,y-8,x+w-6,y-3,0x685d75)
+ rect(far,x+3,y-5,room,5,0x685d75);rect(far,x+4,y-4,room-2,4,0x78677f)
+ if i%3==0 then
+  oval(far,x+w-8,y-7,5,6,0x685d75);rect(far,x+w-7,y-5,3,3,0x78677f)
+ elseif i%4==0 then
+  line(far,x+w-5,y-7,x+w-5,y-1,0x685d75);line(far,x+w-8,y-6,x+w-2,y-6,0x685d75)
+ end
 end
 local blocks={{-4,138,23},{23,131,24},{48,142,20},{69,126,23},{94,137,21},{118,130,24},{146,139,19},{168,123,22},{193,138,21},{217,131,24},{245,140,18},{267,124,22},{293,137,25}}
-for i,b in ipairs(blocks) do local x,y,w=table.unpack(b);local shape={{x,y},{x+2,y},{x+2,y-2},{x+w-3,y-2},{x+w-3,y},{x+w-1,y},{x+w-1,166},{x,166}}
- poly(city,shape,0x675d78);contour(city,shape,0x58516b)
- for wy=y+7,156,12 do if i%3~=0 then rect(city,x+6,wy,2,5,0x59536c);rect(city,x+9,wy,2,5,0x59536c) end end
+for i,b in ipairs(blocks) do local x,y,w=table.unpack(b)
+ rect(city,x,y,w,167-y,0x58516b);rect(city,x+1,y+2,w-2,165-y,0x675d78)
+ line(city,x,y+2,x+w-1,y+2,0x58516b)
+ -- Rooftop stairwell with a small door, water tanks and balcony sunshades.
+ if i%3==1 then
+  rect(city,x+3,y-6,8,6,0x58516b);rect(city,x+4,y-5,6,5,0x675d78);rect(city,x+7,y-3,2,3,0x59536c)
+ elseif i%3==2 then
+  oval(city,x+w-9,y-7,6,6,0x58516b);rect(city,x+w-8,y-5,4,3,0x675d78)
+  line(city,x+w-8,y-1,x+w-8,y,0x58516b)
+ end
+ for wy=y+7,156,12 do
+  rect(city,x+5,wy,3,4,0x59536c);rect(city,x+w-8,wy,3,4,0x59536c)
+  if i%2==0 then
+   line(city,x+3,wy-1,x+w-4,wy-1,0x58516b)
+   line(city,x+3,wy+5,x+w-4,wy+5,0x58516b)
+   for bx=x+4,x+w-4,3 do line(city,bx,wy+3,bx,wy+5,0x58516b) end
+  end
+ end
 end
 -- One connected utility line with varied spans and pole heights.
 local poles={{48,126},{116,120},{203,128},{276,122}}

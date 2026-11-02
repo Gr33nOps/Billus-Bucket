@@ -219,10 +219,10 @@ def compose_music():
 def compose_effects():
     # Paper landing in the blue bucket: rustle followed by a small rim clink.
     pickup = silence(.24)
-    mix(pickup, paper(), 0, .35)
-    mix(pickup, metal(81, .18), .025, .7)
-    mix(pickup, pluck(86, .13, True), .06, .3)
-    export("catch", pickup, .66)
+    mix(pickup, paper(), 0, .9)
+    mix(pickup, paper(), .035, .3)
+    mix(pickup, pluck(93, .09, True), .045, .09)
+    export("catch", pickup, .43)
 
     cues = {
         "start": [(0, 62), (.085, 66), (.17, 69), (.29, 74)],
