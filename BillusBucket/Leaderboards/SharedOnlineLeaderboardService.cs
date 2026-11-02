@@ -158,6 +158,9 @@ namespace BillusBucket
 
             long submittedIdentity = identityRevision;
             rankingsRevision++;
+            CurrentSnapshot = new LeaderboardSnapshot(personalBest: personalBest,
+                currentPlayerWeeklyRank: currentWeeklyRank, weeklyTop10: weeklyTop10,
+                isLoading: true, isOnlineAvailable: isOnlineAvailable, statusMessage: "SAVING SCORE...");
             SharedLeaderboardRemoteResponse remote = await CallTransportAsync(
                 () => transport.SubmitScoreAsync(payload), "OFFLINE - SCORE SAVED LOCALLY");
             if (submittedIdentity != identityRevision)

@@ -32,3 +32,10 @@ Save Codes are bearer credentials, not account authentication. Weekly scores are
 - A Save Code already assigned to a different profile returns an explicit error. Restoring a different profile replaces its local best rather than importing the previous player's best.
 
 The browser UI and Worker changes must both be deployed. Existing duplicate profiles caused by the old hash scheme can be reconciled when their owner next visits with the original stored ID; unrelated same-name profiles remain separate.
+
+## Daylight HUD and automatic leaderboard submission (2026-11-02)
+
+- Gave HUD labels warm light lettering and all four counters a closed dark pixel outline; kept score green and best gold. Verified a daytime art capture without adding a panel over the play area.
+- Confirmed live personal best is saved on each catch, while the completed pre-bomb score is automatically submitted once per run. Submission responses update the player's rank and leaderboard rows without a manual refresh.
+- Added an explicit saving snapshot while upload is pending. Opening/refreshing the board waits for the current run submission, avoiding an old-list flash during upload.
+- Regression test covers live best followed by delayed submission and automatic rank/row update; it failed on the missing pending state before the fix. Release build, gameplay suite, 100 difficulty simulations and all 11 Worker/D1 tests passed, including best retention and duplicate prevention. No synthetic scores were posted to the public board.

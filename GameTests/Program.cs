@@ -33,6 +33,7 @@ namespace GameTests
             TestLeaderboardStore();
             TestLocalLeaderboardAndRestrictedStorage();
             TestBombHitSubmissionAndDuplicateGuard();
+            TestAutomaticRankAfterLiveBest();
             TestCrazyGamesAdapterPolicies();
             TestPokiAdapterZeroNetworkByDefault();
             TestSharedOnlineAdapterAndOfflineFallback();
@@ -753,6 +754,23 @@ namespace GameTests
             Equal(false, duplicateSubmit.Accepted, "duplicate submission for same runId is rejected");
             Equal(true, duplicateSubmit.WasDuplicateRun, "duplicate submission is flagged");
             Equal(1, transport.SubmitCount, "duplicate runId never triggers a second network call");
+        }
+
+        private static void TestAutomaticRankAfterLiveBest()
+        {
+            var pending = new TaskCompletionSource<SharedLeaderboardRemoteResponse>();
+            var transport = new CountingTransport { PendingSubmit = pending.Task };
+            var service = new SharedOnlineLeaderboardService(new InMemoryScoreStorage(), transport, "web");
+            service.RecordLivePersonalBest(12000);
+            Equal(new BigInteger(12000), service.CurrentSnapshot.PersonalBest, "live best is saved before run completion");
+            var submission = service.SubmitRunScoreAsync("new-best-run", 12000, 60f);
+            Equal(true, service.CurrentSnapshot.IsLoading, "pending automatic score upload is visible");
+            pending.SetResult(new SharedLeaderboardRemoteResponse(true, playerWeeklyRank: 1,
+                top10: new[] { new LeaderboardRankEntry(1, "PLAYER", 12000, isCurrentPlayer: true) }));
+            submission.GetAwaiter().GetResult();
+            Equal(1, service.CurrentSnapshot.CurrentPlayerWeeklyRank, "submission updates rank without manual refresh");
+            Equal(new BigInteger(12000), service.CurrentSnapshot.WeeklyTop10[0].Score, "new best appears in leaderboard automatically");
+            Equal(false, service.CurrentSnapshot.IsLoading, "saving ends after submission");
         }
 
         private static void TestCrazyGamesAdapterPolicies()

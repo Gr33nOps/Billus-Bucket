@@ -1549,6 +1549,7 @@ namespace BillusBucket
 
             try
             {
+                await activeRunSubmissionTask;
                 LeaderboardSnapshot snapshot = await leaderboardService.RefreshRankingsAsync();
                 bestKnownCash = BigInteger.Max(bestKnownCash, snapshot.PersonalBest);
                 if (leaderboardService.HasCustomPlayerName)
@@ -2063,11 +2064,11 @@ namespace BillusBucket
 
         private void DrawHud()
         {
-            DrawText("SCORE", new Vector2(4f, 8f), HudLabelColor, scale: 1);
+            DrawHudText("SCORE", new Vector2(4f, 8f), new Color(241, 227, 207));
             BigInteger visibleScore = CurrentPhase == RoundPhase.GameOver ? lastRunCash : run.Cash;
             DrawHudAmount(visibleScore, 19, ScoreValueColor);
 
-            DrawText("BEST", new Vector2(4f, 34f), HudLabelColor, scale: 1);
+            DrawHudText("BEST", new Vector2(4f, 34f), new Color(241, 227, 207));
             BigInteger bestScore = GetCurrentBestScore();
             DrawHudAmount(bestScore, 45, BestValueColor);
 
@@ -2109,7 +2110,17 @@ namespace BillusBucket
             const int rightPadding = 3;
             int availableWidth = PixelArt.PlayLeft - rightPadding - left;
             string label = FitCompactRupeeAmount(amount, availableWidth);
-            DrawText(label, new Vector2(left, y), color, scale: 1);
+            DrawHudText(label, new Vector2(left, y), color);
+        }
+
+        private void DrawHudText(string text, Vector2 position, Color color)
+        {
+            // A closed one-pixel outline preserves the coloured counters in bright daylight.
+            for (int y = -1; y <= 1; y++)
+                for (int x = -1; x <= 1; x++)
+                    if (x != 0 || y != 0)
+                        PixelFont.Draw(batch, pixel, text, position + new Vector2(x, y), TextShadowColor, 1);
+            PixelFont.Draw(batch, pixel, text, position, color, 1);
         }
 
         private static string FitCompactRupeeAmount(BigInteger amount, int availableWidth)
