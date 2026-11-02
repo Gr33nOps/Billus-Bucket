@@ -1891,8 +1891,11 @@ namespace BillusBucket
 
         private void DrawSky()
         {
-            Color top = new Color(111, 164, 184);
-            Color bottom = new Color(218, 191, 162);
+            float night = SkyMotion.NightAmount(elapsed);
+            Color top = Color.Lerp(new Color(111, 164, 184), new Color(34, 36, 65), night);
+            Color bottom = Color.Lerp(new Color(218, 191, 162), new Color(76, 61, 90), night);
+            float dusk = 4f * night * (1f - night);
+            bottom = Color.Lerp(bottom, new Color(180, 124, 137), dusk * .4f);
             for (int y = 0; y < 180; y++)
                 batch.Draw(pixel, new Rectangle(0, y, 320, 1), Color.Lerp(top, bottom, (y / 6) / 29f));
 
@@ -1900,13 +1903,13 @@ namespace BillusBucket
             {
                 Rectangle source = CloudShapes[i];
                 float x = SkyMotion.CloudX(ambientTime, source.X, .45f + i * .1f);
-                batch.Draw(skyClouds, new Vector2(x, source.Y), source, new Color(223, 222, 216));
+                batch.Draw(skyClouds, new Vector2(x, source.Y), source, Color.Lerp(new Color(223, 222, 216), new Color(81, 77, 107), night));
             }
         }
 
         private void DrawScene()
         {
-            batch.Draw(background, Vector2.Zero, Color.White);
+            batch.Draw(background, Vector2.Zero, Color.Lerp(Color.White, new Color(158, 161, 205), SkyMotion.NightAmount(elapsed)));
 
             // Falling rupee notes and bombs
             foreach (Drop drop in drops)
@@ -2070,10 +2073,10 @@ namespace BillusBucket
             if (night <= 0f) return;
             // One shared veil dims sky, paper, bombs, Billu and buildings equally.
             // It precedes the HUD so text and controls retain their contrast.
-            DrawRect(0, 0, 320, 180, new Color(17, 20, 39) * (night * .55f));
+            DrawRect(0, 0, 320, 180, new Color(17, 20, 39) * (night * .22f));
             float light = Math.Clamp((night - .25f) / .5f, 0f, 1f);
             // Brief ignition flicker during dusk; a steady bulb through the short night.
-            if (elapsed % 60f < 42f && light > 0f && light < 1f && (int)(elapsed * 9f) % 4 == 0)
+            if (elapsed % 125f < 65f && light > 0f && light < 1f && (int)(elapsed * 9f) % 4 == 0)
                 light *= .35f;
             DrawRect(23, 138, 11, 15, new Color(240, 166, 80) * (.10f * light));
             DrawRect(25, 140, 7, 11, new Color(240, 166, 80) * (.14f * light));

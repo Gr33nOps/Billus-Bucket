@@ -58,3 +58,7 @@ Outline follow-up: closed exposed rim-highlight pixels in the authored bucket (a
 Reintroduced night as one cool dark veil over the complete world (including sky, clouds, cash, bombs, character and effects), drawn before HUD/dialogs. No moon, stars or birds. The lamp ignites with a short dusk flicker and stays warm at night. Each 60-second run cycle has 30 seconds daylight, 12 seconds smooth dusk, 9 seconds full night and 9 seconds smooth dawn. Uses elapsed run time, already reset on retry and frozen during pause; menus do not consume the opening daylight. Maximum veil opacity is 55%, retaining bomb silhouette/fuse visibility.
 
 Verified cycle timing/continuity tests, zero-warning Release build, full gameplay/difficulty suite, daytime/dusk/night/dawn captures, browser asset/pause checks and mobile landscape sizing. Smooth display-resolution clouds remain intact.
+
+## Fuller night palette and duration (2026-11-02)
+
+Restored blue-purple night sky, muted cool clouds and cool town shading, with a lighter 22% world veil to unify the character, notes and effects. No celestial objects or birds. Extended the run cycle to 125 seconds: 45 daylight, 20 dusk, 40 full night, 20 dawn. Lamp ignition follows the new dusk timing. Run resets and pause behavior remain tied to elapsed gameplay time. Verified revised timing regression fails before the change, passes after; zero-warning solution build, gameplay/difficulty tests and rendered night/dusk/dawn previews passed.
