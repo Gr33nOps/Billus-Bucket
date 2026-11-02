@@ -50,6 +50,7 @@ namespace BillusBucket
             "rupee-notes.png",
             "bomb-sheet.png",
             "bucket-burned.png",
+            "bucket.png",
             "billu-carry.png",
             "billu-burned.png",
             "explosion-sheet.png",

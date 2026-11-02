@@ -25,6 +25,7 @@ namespace GameTests
             TestRoundFlowLeaderboardRules();
             TestBilluAnimator();
             TestDropMotion();
+            TestBucketFeedback();
             TestBucketControl();
             TestLeaderboardStore();
             TestLocalLeaderboardAndRestrictedStorage();
@@ -353,6 +354,28 @@ namespace GameTests
 
             billu.Reset();
             Equal(BilluAction.Straight, billu.Action, "retry restores Billu");
+        }
+
+        private static void TestBucketFeedback()
+        {
+            BucketFeedback feedback = new BucketFeedback();
+            Equal(0, feedback.Notes.Count, "new bucket looks empty");
+            feedback.Collect(2, 500f);
+            Equal(2, feedback.Notes[0], "caught denomination remains in bucket");
+            Equal(8f, feedback.EntryOffset, "entering note stays inside rim");
+            Equal(true, feedback.CatchProgress < 1f, "catch starts a settling animation");
+            feedback.Update(.15f);
+            Equal(1, feedback.ImpactOffset, "landing nudges bucket down");
+            feedback.Update(1f);
+            Equal(0, feedback.ImpactOffset, "bucket settles back after catch");
+            Equal(1f, feedback.CatchProgress, "incoming note finishes settling");
+            Equal(1, feedback.Notes.Count, "stored money remains after animation");
+            for (int i = 0; i < 20; i++) feedback.Collect(i % NoteCatalog.Count, 0f);
+            Equal(5, feedback.Notes.Count, "visible stack stays bounded during long runs");
+            Equal(19 % NoteCatalog.Count, feedback.Notes[4], "stack keeps newest note colours");
+            feedback.Reset();
+            Equal(0, feedback.Notes.Count, "new run or bomb clears visual contents");
+            Equal(0, feedback.ImpactOffset, "reset clears catch movement");
         }
 
         private static void TestDropMotion()

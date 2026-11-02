@@ -4,7 +4,7 @@ root=Path('BillusBucket/Assets')
 for p in root.glob('*.png'):
  im=Image.open(p).convert('RGBA'); assert {value for count,value in im.getchannel('A').getcolors()} <= {0,255},p.name
  assert (root/'Sources'/(p.stem+'.aseprite')).exists(),p.name
-sheet=Image.open(root/'billu-carry.png').convert('RGBA');assert sheet.size==(768,48)
+sheet=Image.open(root/'billu-carry.png').convert('RGBA');assert sheet.size==(768,96)
 frames=[sheet.crop((i*32,0,(i+1)*32,48)) for i in range(24)]
 bucket=Image.open(root/'bucket.png').convert('RGBA')
 for i,f in enumerate(frames):
@@ -33,3 +33,7 @@ print('Scarf neck outline passed in all walking frames.')
 
 for i in range(12):
  assert frames[i].tobytes()!=frames[i+12].tobytes(),("missing blink",i)
+
+for i in range(24):
+ assert sheet.crop((i*32,16,i*32+32,44)).tobytes()==sheet.crop((i*32,64,i*32+32,92)).tobytes(),('body layer mismatch',i)
+print('Separate body rendering preserves every character frame.')

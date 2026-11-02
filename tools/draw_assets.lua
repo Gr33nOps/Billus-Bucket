@@ -86,7 +86,7 @@ saveFrames('bucket-burned',{wreck},28,16)
 -- Character: 24x32. Body, arms, and expression are authored at native size.
 local function simplifyBillu(a)
  -- Larger flat color groups match the props; keep expressive eyes and silhouette.
- local merge={{'skinlight','skin'},{'goldlight','gold'},{'teallight','teal'},{'pantslight','pants'},{'hairlight','hair'}}
+ local merge={{'goldlight','gold'}}
  for y=0,a.height-1 do for x=0,a.width-1 do
   local c=a:getPixel(x,y)
   for _,pair in ipairs(merge) do if c==col(pair[1]) then px(a,x,y,pair[2]);break end end
@@ -165,6 +165,10 @@ local function sideWalk(step,left)
   for y=0,31 do for x=0,23 do turned:drawPixel(23-x,y,a:getPixel(x,y)) end end
   a=turned
  end
+ -- Broad shirt light and hem shadow match the bucket's restrained shade groups.
+ for y=19,21 do for x=10,11 do
+  if a:getPixel(x,y)==col('teal') then px(a,x,y,'teallight') end
+ end end
  -- One broad hem shadow keeps the cloth simple.
  for x=10,14 do if a:getPixel(x,22)==col('teal') then px(a,x,22,'tealshade') end end
  return outlineBillu(simplifyBillu(a))
@@ -250,24 +254,28 @@ local function billu(side,step,burn)
 end
 local carry={}
 for row=0,2 do for f=0,3 do
- local a=img(32,48)
+ local a=img(32,96)
  local body=row==0 and billu(false,f,false) or sideWalk(f,row==2)
  paste(a,body,4,12);paste(a,bucket,2,0)
+ -- Lower atlas row exposes the full body for independent bucket impact.
+ paste(a,body,4,60)
  carry[#carry+1]=a
 end end
 -- Matching closed-eye frames keep blinking independent from foot contacts.
 for i=1,12 do
  local a=carry[i]:clone()
+ for _,dy in ipairs({0,48}) do
  if i<=4 then
-  rect(a,11,21,4,2,'skin');rect(a,17,21,4,2,'skin')
-  line(a,11,22,14,22,'ink');line(a,17,22,20,22,'ink')
+  rect(a,11,21+dy,4,2,'skin');rect(a,17,21+dy,4,2,'skin')
+  line(a,11,22+dy,14,22+dy,'ink');line(a,17,22+dy,20,22+dy,'ink')
  else
   local eyeX=i<=8 and 17 or 11
-  rect(a,eyeX,21,4,2,'skin');line(a,eyeX,22,eyeX+3,22,'ink')
+  rect(a,eyeX,21+dy,4,2,'skin');line(a,eyeX,22+dy,eyeX+3,22+dy,'ink')
+ end
  end
  carry[#carry+1]=a
 end
-saveFrames('billu-carry',carry,32,48,{{'straight',1,4},{'walk-right',5,8},{'walk-left',9,12},{'blink',13,24}})
+saveFrames('billu-carry',carry,32,96,{{'straight',1,4},{'walk-right',5,8},{'walk-left',9,12},{'blink',13,24}})
 local burned=billu(false,0,true);local blink=burned:clone();rect(blink,7,9,4,2,'soot');rect(blink,13,9,4,2,'soot');rect(blink,7,10,4,1,'ash');rect(blink,13,10,4,1,'ash')
 saveFrames('billu-burned',{burned,blink},24,32,{{'cry',1,2}})
 saveFrames('billu-body',{billu(false,0,false)},24,32)

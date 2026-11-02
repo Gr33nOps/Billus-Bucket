@@ -45,7 +45,9 @@ namespace BillusBucket
             "paused",
             "explosion",
             "burned",
-            "retry"
+            "retry",
+            "catch-impact",
+            "bucket-full"
         };
 
         private static readonly Vector2[] SampleCashPositions =
@@ -88,10 +90,12 @@ namespace BillusBucket
         public ArtReviewFrame PrepareArtReviewState(
             RoundFlow flow,
             BilluAnimator billu,
-            List<Drop> drops)
+            List<Drop> drops,
+            BucketFeedback bucketFeedback)
         {
             flow.Reset();
             billu.Reset();
+            bucketFeedback.Reset();
             drops.Clear();
 
             BillusBucketRun run = new BillusBucketRun();
@@ -114,6 +118,9 @@ namespace BillusBucket
             {
                 run.CatchCash();
             }
+
+            for (int i = 0; i < 5; i++) bucketFeedback.Collect(i, 0f);
+            bucketFeedback.Update(artReviewIndex == 8 ? .15f : .4f);
 
             foreach (Vector2 point in SampleCashPositions)
             {

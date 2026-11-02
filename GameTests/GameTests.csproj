@@ -16,6 +16,7 @@
     <Compile Include="..\BillusBucket\Gameplay\DropMotion.cs" Link="DropMotion.cs" />
     <Compile Include="..\BillusBucket\Gameplay\Drop.cs" Link="Drop.cs" />
     <Compile Include="..\BillusBucket\Gameplay\BucketControl.cs" Link="BucketControl.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\BucketFeedback.cs" Link="BucketFeedback.cs" />
     <Compile Include="..\BillusBucket\Persistence\LeaderboardStore.cs" Link="LeaderboardStore.cs" />
     <Compile Include="..\BillusBucket\Presentation\CashDisplay.cs" Link="CashDisplay.cs" />
     <Compile Include="..\BillusBucket\Gameplay\RoundFlow.cs" Link="RoundFlow.cs" />

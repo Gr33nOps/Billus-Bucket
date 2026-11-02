@@ -152,6 +152,7 @@ namespace BillusBucket
         private Texture2D cashSprite;
         private Texture2D bombSprite;
         private Texture2D burnedBucketSprite;
+        private Texture2D bucketSprite;
         private Texture2D billuSheet;
         private Texture2D burnedSprite;
         private Texture2D explosionSheet;
@@ -165,6 +166,7 @@ namespace BillusBucket
         // Gameplay systems & collections
         private readonly RoundFlow flow = new RoundFlow();
         private readonly BilluAnimator billu = new BilluAnimator();
+        private readonly BucketFeedback bucketFeedback = new BucketFeedback();
         private readonly Random random = new Random();
         private readonly List<Drop> drops = new List<Drop>();
         private readonly List<Particle> particles = new List<Particle>();
@@ -277,6 +279,7 @@ namespace BillusBucket
 
             bombSprite = LoadArt("bomb-sheet.png");
             burnedBucketSprite = LoadArt("bucket-burned.png");
+            bucketSprite = LoadArt("bucket.png");
             billuSheet = LoadArt("billu-carry.png");
             burnedSprite = LoadArt("billu-burned.png");
             explosionSheet = LoadArt("explosion-sheet.png");
@@ -364,6 +367,7 @@ namespace BillusBucket
             cashSprite?.Dispose();
             bombSprite?.Dispose();
             burnedBucketSprite?.Dispose();
+            bucketSprite?.Dispose();
             billuSheet?.Dispose();
             burnedSprite?.Dispose();
             explosionSheet?.Dispose();
@@ -383,7 +387,7 @@ namespace BillusBucket
         {
             if (reviewTools.IsArtReviewMode)
             {
-                ArtReviewFrame frame = reviewTools.PrepareArtReviewState(flow, billu, drops);
+                ArtReviewFrame frame = reviewTools.PrepareArtReviewState(flow, billu, drops, bucketFeedback);
                 run = frame.Run;
                 lastRunCash = frame.LastRunCash;
                 explosionTimer = frame.ExplosionTimer;
@@ -1351,6 +1355,7 @@ namespace BillusBucket
             flash = 0f;
             lastRunCash = BigInteger.Zero;
             billu.Reset();
+            bucketFeedback.Reset();
         }
 
         private readonly List<(Drop Drop, float Time)> frameCatches = new List<(Drop, float)>();
@@ -1377,6 +1382,7 @@ namespace BillusBucket
             float previousBucketX = bucket.X;
             bucket.Update(dt, keyboardDirection, pointerTargetX);
             billu.Update(dt, bucket.VelocityX);
+            bucketFeedback.Update(dt);
 
             elapsed += dt;
             spawnTimer -= dt;
@@ -1456,6 +1462,7 @@ namespace BillusBucket
         {
             int caughtValue = drop.Value;
             run.CatchCash(caughtValue);
+            bucketFeedback.Collect(drop.NoteIndex, drop.Motion.X - bucket.X);
             bestKnownCash = BigInteger.Max(bestKnownCash, run.BestCash);
 
             float smallVariation = (float)random.NextDouble() * 0.024f - 0.012f;
@@ -1476,6 +1483,7 @@ namespace BillusBucket
 
             flow.HitBomb();
             billu.Burn();
+            bucketFeedback.Reset();
             explosionTimer = ExplosionDurationSeconds;
             audio?.HitBomb();
             flash = ScreenFlashDuration;
@@ -1801,6 +1809,37 @@ namespace BillusBucket
             }
         }
 
+        private void DrawCatchingBucket(Vector2 root)
+        {
+            int x = (int)root.X - 14;
+            int y = (int)root.Y - 44 + bucketFeedback.ImpactOffset;
+            batch.Draw(bucketSprite, new Vector2(x, y), Color.White);
+            float progress = bucketFeedback.CatchProgress;
+            int count = bucketFeedback.Notes.Count;
+            int settledCount = progress < 1f ? count - 1 : count;
+            for (int i = 0; i < settledCount; i++)
+            {
+                int sourceX = bucketFeedback.Notes[i] * NoteCatalog.FramesPerNote * NoteFrameWidth;
+                // Overlapping paper tops remain inside the opening, behind its front lip.
+                batch.Draw(cashSprite, new Rectangle(x + 3 + i * 3, y + 2 - i % 2, 8, 5),
+                    new Rectangle(sourceX, 0, NoteFrameWidth, NoteFrameHeight), Color.White);
+            }
+            if (count > 0 && progress < 1f)
+            {
+                float ease = 1f - (1f - progress) * (1f - progress);
+                int width = (int)MathF.Round(12f - ease * 4f);
+                int height = (int)MathF.Round(8f - ease * 3f);
+                float target = 3 + (count - 1) * 3 + 4;
+                int center = x + (int)MathF.Round(MathHelper.Lerp(14 + bucketFeedback.EntryOffset, target, ease));
+                int top = y + (int)MathF.Round(MathHelper.Lerp(-7f, 2 - (count - 1) % 2, ease));
+                int sourceX = bucketFeedback.Notes[count - 1] * NoteCatalog.FramesPerNote * NoteFrameWidth;
+                batch.Draw(cashSprite, new Rectangle(center - width / 2, top, width, height),
+                    new Rectangle(sourceX, 0, NoteFrameWidth, NoteFrameHeight), Color.White);
+            }
+            // The front rim and body occlude the paper as it drops inside.
+            batch.Draw(bucketSprite, new Vector2(x, y + 5), new Rectangle(0, 5, 28, 11), Color.White);
+        }
+
         private void DrawScene()
         {
             batch.Draw(background, Vector2.Zero, Color.White);
@@ -1852,13 +1891,14 @@ namespace BillusBucket
                 batch.Draw(
                     billuSheet,
                     characterRoot,
-                    new Rectangle(frame * 32, 0, 32, 48),
+                    new Rectangle(frame * 32, 48, 32, 48),
                     Color.White,
                     0f,
                     new Vector2(16f, 44f),
                     1f,
                     SpriteEffects.None,
                     0f);
+                DrawCatchingBucket(characterRoot);
             }
             else
             {

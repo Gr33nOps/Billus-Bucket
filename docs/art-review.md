@@ -25,3 +25,11 @@ Visual review covers these assets and states; artistic preference still benefits
 Follow-up: closed the two teal gaps at the scarf neck edge in both directions; added matching shirt hems, trouser folds and tank-like bucket reflections. Directional scarf and outline regression checks pass in every walk frame.
 
 Face/readability follow-up: ranking numbers now remain visible on the highlighted player row. Removed the single side-pose tooth, closed the nose-to-sleeve contour, simplified clothing/hair highlights, and added independent brief blinking with matching eye frames for every gait. Release build, C# tests, atlas checks and Chromium UI review passed.
+
+## Catching and character finish — 2026-11-02
+
+Matched the character's material shading to the detailed bucket using broad hair, skin, shirt and trouser shade groups; the bucket artwork retains its detail. The character atlas now also includes a body-only row so the bucket can react independently. Blink, gait and scarf outline checks cover both render layers.
+
+Caught notes animate down into the mouth, with a brief one-pixel dip/rebound in the bucket. Overlapping note tops in the caught denominations remain behind its front lip, showing a bounded stack of the latest five notes. The stack follows movement, freezes on pause and clears on a bomb/new run. Catch presentation does not move the hitbox or change scoring.
+
+Reviewed ready, carrying, both walking directions, pause, catch impact, full bucket and burned screenshots from the desktop renderer. Release build with warnings as errors, C# catch persistence/reset tests, atlas checks and desktop/mobile browser checks passed.
