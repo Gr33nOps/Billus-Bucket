@@ -50,12 +50,10 @@ poly(bucket,{{3,4},{24,4},{22,13},{20,15},{7,15},{5,13}},'ink')
 poly(bucket,{{4,5},{23,5},{21,13},{19,14},{8,14},{6,12}},'blueshade')
 poly(bucket,{{5,5},{22,5},{20,12},{19,13},{8,13},{6,11}},'blue')
 -- Broad metal shading: the light stays upper-left in every facing.
-line(bucket,6,7,7,10,'bluelight');line(bucket,7,11,9,12,'bluelight')
+rect(bucket,7,7,2,4,0x5299b1)
 line(bucket,21,7,20,11,'blueshade')
 -- A broad reflected patch and a shaded bottom seam, like the rooftop tank.
-rect(bucket,8,7,3,3,0x5299b1)
 line(bucket,10,13,18,13,'blueshade')
-line(bucket,15,10,17,10,0x5299b1)
 -- An open oval mouth, with a bright front lip distinct from the body.
 oval(bucket,0,0,28,7,'ink');oval(bucket,2,1,24,5,'bluelight')
 oval(bucket,4,2,20,3,'ink')
@@ -100,7 +98,7 @@ saveFrames('bucket-burned',{wreck},28,16)
 -- Character: 24x32. Body, arms, and expression are authored at native size.
 local function simplifyBillu(a)
  -- Larger flat color groups match the props; keep expressive eyes and silhouette.
- local merge={{'goldlight','gold'}}
+ local merge={{'goldlight','gold'},{'skinlight','skin'},{'teallight','teal'},{'pantslight','pants'}}
  for y=0,a.height-1 do for x=0,a.width-1 do
   local c=a:getPixel(x,y)
   for _,pair in ipairs(merge) do if c==col(pair[1]) then px(a,x,y,pair[2]);break end end
@@ -405,8 +403,8 @@ local function cloud(x,y,points)
  for _,p in ipairs(points) do
   shape[#shape+1]={x+p[1],y+p[2]}
  end
- poly(clouds,shape,0x6a5a7b)
- contour(clouds,shape,0x5e5271)
+poly(clouds,shape,0xd5d5d5)
+ contour(clouds,shape,0xbebebe)
 end
 -- Three individually drawn silhouettes, rather than scaled copies.
 -- Upper cloud: taller left puff with a long trailing edge.
@@ -415,7 +413,7 @@ cloud(157,58,{{0,0},{0,-1},{3,-1},{3,-3},{8,-3},{8,-5},{13,-5},{13,-8},{19,-8},{
 cloud(68,95,{{0,0},{0,-1},{4,-1},{4,-3},{8,-3},{8,-5},{14,-5},{14,-3},{20,-3},{20,-4},{23,-4},{23,-6},{29,-6},{29,-4},{33,-4},{33,-2},{37,-2},{37,-1},{40,-1},{40,0}})
 -- Small right cloud: a compact puff and a short left wisp.
 cloud(224,85,{{0,0},{0,-1},{7,-1},{7,-2},{11,-2},{11,-4},{14,-4},{14,-5},{18,-5},{18,-3},{21,-3},{21,-1},{24,-1},{24,0}})
-paste(sky,clouds,0,0)
+saveFrames('sky-clouds',{clouds},320,180)
 -- Muted dusk: no sun or stars.
 local far=img(320,180);local city=img(320,180)
 local buildings={{0,128,19},{19,116,16},{35,125,21},{56,112,16},{72,130,22},{94,121,19},{113,110,17},{130,128,21},{151,118,24},{175,127,15},{190,108,18},{208,124,23},{231,114,16},{247,123,24},{271,108,18},{289,119,18},{307,125,13}}
@@ -461,7 +459,7 @@ local props=img(320,180)
 rect(props,0,128,38,37,0x513e56);rect(props,1,130,34,35,0x8e5b59);rect(props,2,133,29,31,0xa36959)
 rect(props,0,126,41,4,0x6e4650);rect(props,0,126,40,1,0xb58a82);rect(props,36,130,3,35,0x674653)
 rect(props,5,141,17,24,0x533747);rect(props,7,143,13,22,0x322a40);rect(props,7,143,2,22,0x68454b);px(props,18,155,0xc49365)
-rect(props,28,134,1,8,'ink');oval(props,24,139,9,10,'ink');oval(props,25,140,7,8,0xc47c47);oval(props,27,142,3,5,'gold');px(props,28,143,'white')
+rect(props,28,134,1,8,'ink');oval(props,24,139,9,10,'ink');oval(props,25,140,7,8,0x69595b);oval(props,27,142,3,5,0xa28b75);px(props,28,143,0xc3aa87)
 for _,q in ipairs({{3,135},{24,132},{31,151},{23,160},{33,138},{1,158}}) do rect(props,q[1],q[2],3,1,0x8e5b59);px(props,q[1]+2,q[2]+1,0xb77c64) end
 rect(props,7,118,2,8,'ink');rect(props,28,118,2,8,'ink');line(props,9,120,28,125,'ink');line(props,28,120,9,125,'ink')
 poly(props,{{7,103},{11,100},{26,100},{30,104},{30,118},{7,118}},'ink');rect(props,9,104,19,13,'blueshade');rect(props,10,104,5,12,0x3d6687)
@@ -520,6 +518,21 @@ line(roof,0,164,319,164,'ink')
 line(props,0,164,319,164,'ink')
 line(roof,0,166,319,166,'ink')
 local scene=Sprite(320,180,ColorMode.RGB)
+local scenery=img(320,180)
+for _,layer in ipairs({far,city,roof,props}) do paste(scenery,layer,0,0) end
+-- Sunlit town palette. Runtime lighting shifts these broad groups into cool night.
+local dayColours={
+ [0x78677f]=0xa09a9c,[0x685d75]=0x88848e,
+ [0x675d78]=0x878697,[0x58516b]=0x737384,[0x59536c]=0x747385,
+ [0x484158]=0x656071
+}
+for y=0,179 do for x=0,319 do
+ local p=scenery:getPixel(x,y)
+ local rgb=(app.pixelColor.rgbaR(p)<<16)|(app.pixelColor.rgbaG(p)<<8)|app.pixelColor.rgbaB(p)
+ if app.pixelColor.rgbaA(p)>0 and dayColours[rgb] then px(scenery,x,y,dayColours[rgb]) end
+end end
+saveFrames('rooftop-scenery',{scenery},320,180)
+paste(sky,clouds,0,0)
 local layers={{'Sky',sky},{'Distant town',far},{'Windows and wires',city},{'Rooftop',roof},{'Tank laundry and plants',props}}
 local combined=img(320,180)
 for i,t in ipairs(layers) do local layer=i==1 and scene.layers[1] or scene:newLayer();layer.name=t[1];scene:newCel(layer,1,t[2],Point(0,0));paste(combined,t[2],0,0) end

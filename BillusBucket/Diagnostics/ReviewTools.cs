@@ -47,7 +47,12 @@ namespace BillusBucket
             "burned",
             "retry",
             "catch-impact",
-            "bucket-full"
+            "bucket-full",
+            "day",
+            "dusk",
+            "night",
+            "dawn",
+            "single-note"
         };
 
         private static readonly Vector2[] SampleCashPositions =
@@ -101,7 +106,7 @@ namespace BillusBucket
             BillusBucketRun run = new BillusBucketRun();
             BigInteger lastRunCash = BigInteger.Zero;
             float explosionTimer = 0f;
-            const float ambientTime = 0.6f;
+            float ambientTime = artReviewIndex switch { 10 => 0f, 11 => 45f, 12 => 90f, 13 => 135f, _ => .6f };
 
             if (artReviewIndex == 0)
             {
@@ -121,6 +126,12 @@ namespace BillusBucket
 
             for (int i = 0; i < 5; i++) bucketFeedback.Collect(i, 0f);
             bucketFeedback.Update(artReviewIndex == 8 ? .15f : .4f);
+            if (artReviewIndex == 14)
+            {
+                bucketFeedback.Reset();
+                bucketFeedback.Collect(4, 0f);
+                bucketFeedback.Update(10f);
+            }
 
             foreach (Vector2 point in SampleCashPositions)
             {

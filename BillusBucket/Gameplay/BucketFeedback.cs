@@ -29,7 +29,7 @@ namespace BillusBucket
             int variation = (++catchNumber * 7) % 11;
             placements.Add(new PaperPlacement(
                 Math.Clamp(EntryOffset * .45f + (variation - 5) * .7f, -5f, 5f),
-                (variation - 5) * .055f, catchNumber % 4, catchNumber % 3 == 0 ? 1 : 0));
+                (variation - 5) * .055f, 0, catchNumber % 3 == 0 ? 1 : 0));
             catchAge = 0f;
         }
 

@@ -26,6 +26,8 @@ namespace GameTests
             TestBilluAnimator();
             TestDropMotion();
             TestBucketFeedback();
+            TestSkyCycle();
+
             TestBucketControl();
             TestLeaderboardStore();
             TestLocalLeaderboardAndRestrictedStorage();
@@ -370,6 +372,13 @@ namespace GameTests
             Equal(0, feedback.ImpactOffset, "bucket settles back after catch");
             Equal(1f, feedback.CatchProgress, "incoming note finishes settling");
             Equal(1, feedback.Notes.Count, "stored money remains after animation");
+            for (int i = 0; i < 24; i++)
+            {
+                feedback.Collect(i % NoteCatalog.Count, 0f);
+                feedback.Update(2f);
+                foreach (var paper in feedback.Placements)
+                    Equal(0, paper.Frame, "settled notes show their broad face above the rim");
+            }
             for (int i = 0; i < 20; i++) feedback.Collect(i % NoteCatalog.Count, 0f);
             Equal(5, feedback.Notes.Count, "visible stack stays bounded during long runs");
             var retainedPaper = feedback.Placements[1];
@@ -379,6 +388,18 @@ namespace GameTests
             feedback.Reset();
             Equal(0, feedback.Notes.Count, "new run or bomb clears visual contents");
             Equal(0, feedback.ImpactOffset, "reset clears catch movement");
+        }
+
+        private static void TestSkyCycle()
+        {
+            Equal(true, SkyCycle.Night(0f) < .01f, "cycle begins in daylight");
+            Equal(true, SkyCycle.Night(90f) > .99f, "cycle reaches night");
+            Equal(true, SkyCycle.Night(180f) < .01f, "cycle returns to day");
+            for (int i = 1; i < 1800; i++)
+                Equal(true, Math.Abs(SkyCycle.Night(i / 10f) - SkyCycle.Night((i - 1) / 10f)) < .01f,
+                    "lighting changes gradually without abrupt switches");
+            Equal(true, SkyCycle.CloudX(10f, 100f, 1f) > SkyCycle.CloudX(0f, 100f, 1f), "clouds drift right");
+            Equal(true, SkyCycle.CloudX(250f, 100f, 1f) < 0f, "cloud wraps outside view");
         }
 
         private static void TestDropMotion()

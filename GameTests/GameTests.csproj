@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="..\BillusBucket\Gameplay\SkyCycle.cs" Link="SkyCycle.cs" />
     <Compile Include="DifficultyChecks.cs" />
     <Compile Include="..\BillusBucket\Gameplay\NoteCatalog.cs" Link="NoteCatalog.cs" />
     <Compile Include="..\BillusBucket\Gameplay\DropDirector.cs" Link="DropDirector.cs" />

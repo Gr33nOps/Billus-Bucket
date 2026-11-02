@@ -149,6 +149,11 @@ namespace BillusBucket
         private RenderTarget2D canvas;
         private Texture2D pixel;
         private Texture2D background;
+        private Texture2D skyClouds;
+        private static readonly Rectangle[] CloudShapes = {
+            new Rectangle(157, 50, 44, 9), new Rectangle(68, 89, 41, 7), new Rectangle(224, 80, 25, 6)
+        };
+        private static readonly string[] MoonRows = { "..xxxx.", ".xxx...", "xxx....", "xx.....", "xxx....", ".xxx...", "..xxxx." };
         private Texture2D cashSprite;
         private Texture2D paperSilhouette;
         private Texture2D bombSprite;
@@ -274,7 +279,8 @@ namespace BillusBucket
             pixel = new Texture2D(GraphicsDevice, 1, 1);
             pixel.SetData(new[] { Color.White });
 
-            background = LoadArt("rooftop.png");
+            background = LoadArt("rooftop-scenery.png");
+            skyClouds = LoadArt("sky-clouds.png");
             cashSprite = LoadArt("rupee-notes.png");
             notePopupColors = SampleNoteColors(cashSprite);
             Color[] paperMask = new Color[cashSprite.Width * cashSprite.Height];
@@ -371,6 +377,7 @@ namespace BillusBucket
             canvas?.Dispose();
             pixel?.Dispose();
             background?.Dispose();
+            skyClouds?.Dispose();
             cashSprite?.Dispose();
             paperSilhouette?.Dispose();
             bombSprite?.Dispose();
@@ -1829,7 +1836,7 @@ namespace BillusBucket
                 var paper = bucketFeedback.Placements[i];
                 bool entering = i == count - 1 && progress < 1f;
                 float offset = paper.Offset;
-                float height = 3f + paper.Depth;
+                float height = 1f + paper.Depth;
                 float tilt = paper.Tilt;
                 float scale = 2f / 3f;
                 if (entering)
@@ -1868,9 +1875,71 @@ namespace BillusBucket
             batch.Draw(bucketSprite, new Vector2(x, y + 5), new Rectangle(0, 5, 28, 11), Color.White);
         }
 
+        private void DrawSky()
+        {
+            float night = SkyCycle.Night(ambientTime);
+            float dusk = 4f * night * (1f - night);
+            Color top = Color.Lerp(new Color(111, 164, 184), new Color(34, 36, 65), night);
+            Color bottom = Color.Lerp(new Color(218, 191, 162), new Color(76, 61, 90), night);
+            bottom = Color.Lerp(bottom, new Color(180, 124, 137), dusk * .4f);
+            for (int y = 0; y < 180; y++)
+                batch.Draw(pixel, new Rectangle(0, y, 320, 1), Color.Lerp(top, bottom, (y / 6) / 29f));
+
+            // Sparse, fixed stars fade in; all marks stay on the native pixel grid.
+            float stars = Math.Clamp((night - .68f) / .32f, 0f, 1f);
+            for (int i = 0; i < 13; i++)
+            {
+                int x = 63 + (i * 47) % 215;
+                int y = 9 + (i * 19) % 52;
+                batch.Draw(pixel, new Rectangle(x, y, 1, 1), new Color(218, 211, 196) * stars);
+            }
+            // Small pixel moon; it shares the clouds' restrained, low-contrast palette.
+            Color moon = new Color(204, 208, 197) * stars;
+            for (int y = 0; y < MoonRows.Length; y++)
+                for (int x = 0; x < MoonRows[y].Length; x++)
+                    if (MoonRows[y][x] == 'x') batch.Draw(pixel, new Rectangle(241 + x, 18 + y, 1, 1), moon);
+
+            Color cloudTint = Color.Lerp(new Color(223, 222, 216), new Color(81, 77, 107), night);
+            for (int i = 0; i < CloudShapes.Length; i++)
+            {
+                Rectangle source = CloudShapes[i];
+                int x = (int)SkyCycle.CloudX(ambientTime, source.X, .65f + i * .17f);
+                // Neutral source shades retain the same soft edge under both palettes.
+                batch.Draw(skyClouds, new Vector2(x, source.Y), source, cloudTint);
+            }
+
+            float birds = 1f - Math.Clamp((night - .2f) / .4f, 0f, 1f);
+            for (int i = 0; i < 3; i++)
+            {
+                int x = (int)SkyCycle.CloudX(ambientTime, 105 + i * 13, 6f);
+                int y = 22 + i * 4;
+                int flap = (int)(ambientTime * 5f + i) % 4;
+                int wing = flap == 0 ? -2 : flap == 2 ? 1 : -1;
+                Color bird = new Color(76, 83, 104) * birds;
+                batch.Draw(pixel, new Rectangle(x, y, 1, 1), bird);
+                batch.Draw(pixel, new Rectangle(x - 2, y + wing, 2, 1), bird);
+                batch.Draw(pixel, new Rectangle(x + 1, y + wing, 2, 1), bird);
+                if (wing == -2)
+                {
+                    batch.Draw(pixel, new Rectangle(x - 1, y - 1, 1, 1), bird);
+                    batch.Draw(pixel, new Rectangle(x + 1, y - 1, 1, 1), bird);
+                }
+            }
+
+            batch.Draw(background, Vector2.Zero, Color.Lerp(Color.White, new Color(132, 140, 185), night));
+            float lamp = Math.Clamp((night - .46f) / .12f, 0f, 1f);
+            if (lamp > 0f && lamp < 1f && (int)(ambientTime * 8f) % 5 == 0) lamp *= .3f;
+            // Restrained stepped light on the room's plaster, behind the enclosed bulb.
+            batch.Draw(pixel, new Rectangle(23, 138, 11, 15), new Color(240, 166, 80) * (.09f * lamp));
+            batch.Draw(pixel, new Rectangle(25, 140, 7, 11), new Color(240, 166, 80) * (.12f * lamp));
+            batch.Draw(pixel, new Rectangle(26, 141, 5, 6), new Color(204, 133, 66) * lamp);
+            batch.Draw(pixel, new Rectangle(27, 142, 3, 4), new Color(239, 195, 105) * lamp);
+            batch.Draw(pixel, new Rectangle(28, 142, 1, 2), new Color(255, 235, 168) * lamp);
+        }
+
         private void DrawScene()
         {
-            batch.Draw(background, Vector2.Zero, Color.White);
+            DrawSky();
 
             // Falling rupee notes and bombs
             foreach (Drop drop in drops)

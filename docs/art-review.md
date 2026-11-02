@@ -37,3 +37,11 @@ Reviewed ready, carrying, both walking directions, pause, catch impact, full buc
 Pile refinement: each paper now retains its own offset, fold and tilt when later notes arrive. Incoming notes fall near the catch point, flutter and briefly bounce into an uneven overlapping pile instead of sliding into evenly spaced slots. Reviewed full/impact renderer captures; gameplay checks and warnings-as-errors build passed.
 
 Outline follow-up: closed exposed rim-highlight pixels in the authored bucket (and matching favicon/carry atlas). Added a solid alpha-silhouette border at native resolution around rotated/scaled pile notes and restored side rim caps above them. Empty, impact and full-bucket renderer captures reviewed; closed-contour regression, Release build, gameplay tests and browser launch passed.
+
+## Day/night scenery and persistent bucket contents (2026-11-02)
+
+- Settled cash uses the broad paper face and sits higher in the mouth, keeping colour visible after the catch animation. The bounded five-note pile still retains its contents until a bomb or new run; existing placements do not shuffle when a new paper arrives.
+- Simplified scattered skin, shirt, trouser and bucket highlights into broader colour groups. Preserved scarf/sleeve/shoe outlines, facial animation and directional poses; regenerated matching editable Aseprite sources and favicon.
+- Split scenery and clouds into authored transparent assets. A 180-second day/night cycle blends the sky and town palette, with dusk colour, a small crescent and sparse stars at night. The left lamp fades/flickers on at dusk and off at dawn. Three clouds drift right at different gentle speeds behind the town; three small flapping birds cross the upper daylight sky.
+- Environment motion follows the existing ambient clock and freezes with pause. Render coordinates remain integer native pixels, with point sampling and no collision changes.
+- Verification: Release solution build with warnings as errors; gameplay/platform/leaderboard checks and 100 seeded difficulty runs; PNG/outline/source checks; deterministic day/dusk/night/dawn and single-note captures; local Chromium desktop lifecycle and three mobile landscape viewport checks.

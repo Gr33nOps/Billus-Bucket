@@ -47,6 +47,8 @@ namespace BillusBucket
         public static readonly string[] RequiredAssets =
         {
             "rooftop.png",
+            "rooftop-scenery.png",
+            "sky-clouds.png",
             "rupee-notes.png",
             "bomb-sheet.png",
             "bucket-burned.png",
