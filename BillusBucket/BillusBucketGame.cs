@@ -409,6 +409,7 @@ namespace BillusBucket
                 lastRunCash = frame.LastRunCash;
                 explosionTimer = frame.ExplosionTimer;
                 ambientTime = frame.AmbientTime;
+                elapsed = frame.AmbientTime;
                 ClearHoverStates();
                 return;
             }
@@ -2042,6 +2043,7 @@ namespace BillusBucket
                 DrawRect(0, 0, PixelArt.FieldWidth, PixelArt.Height, WarmTitleColor * flash);
             }
 
+            DrawNightLighting();
             DrawHud();
 
             if (flow.IsLeaderboardOpen)
@@ -2060,6 +2062,24 @@ namespace BillusBucket
             {
                 DrawGameOverScreen();
             }
+        }
+
+        private void DrawNightLighting()
+        {
+            float night = SkyMotion.NightAmount(elapsed);
+            if (night <= 0f) return;
+            // One shared veil dims sky, paper, bombs, Billu and buildings equally.
+            // It precedes the HUD so text and controls retain their contrast.
+            DrawRect(0, 0, 320, 180, new Color(17, 20, 39) * (night * .55f));
+            float light = Math.Clamp((night - .25f) / .5f, 0f, 1f);
+            // Brief ignition flicker during dusk; a steady bulb through the short night.
+            if (elapsed % 60f < 42f && light > 0f && light < 1f && (int)(elapsed * 9f) % 4 == 0)
+                light *= .35f;
+            DrawRect(23, 138, 11, 15, new Color(240, 166, 80) * (.10f * light));
+            DrawRect(25, 140, 7, 11, new Color(240, 166, 80) * (.14f * light));
+            DrawRect(26, 141, 5, 6, new Color(204, 133, 66) * light);
+            DrawRect(27, 142, 3, 4, new Color(239, 195, 105) * light);
+            DrawRect(28, 142, 1, 2, new Color(255, 235, 168) * light);
         }
 
         private void DrawHud()

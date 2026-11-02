@@ -49,9 +49,9 @@ namespace BillusBucket
             "catch-impact",
             "bucket-full",
             "day",
-            "day-later",
-            "day-clouds",
-            "day-wrapped",
+            "dusk",
+            "night",
+            "dawn",
             "single-note"
         };
 
@@ -106,7 +106,7 @@ namespace BillusBucket
             BillusBucketRun run = new BillusBucketRun();
             BigInteger lastRunCash = BigInteger.Zero;
             float explosionTimer = 0f;
-            float ambientTime = artReviewIndex switch { 10 => 0f, 11 => 45f, 12 => 90f, 13 => 135f, _ => .6f };
+            float ambientTime = artReviewIndex switch { 10 => 0f, 11 => 36f, 12 => 46f, 13 => 56f, _ => .6f };
 
             if (artReviewIndex == 0)
             {

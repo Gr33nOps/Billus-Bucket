@@ -410,6 +410,15 @@ namespace GameTests
 
         private static void TestSkyMotion()
         {
+            Equal(0f, SkyMotion.NightAmount(0), "each new run starts in daylight");
+            Equal(0f, SkyMotion.NightAmount(30), "opening stays daylight");
+            Equal(1f, SkyMotion.NightAmount(42), "dusk reaches night gradually");
+            Equal(1f, SkyMotion.NightAmount(51), "night holds briefly");
+            Equal(0f, SkyMotion.NightAmount(60), "day returns after short night");
+            Equal(0f, SkyMotion.NightAmount(90), "next cycle opens with daylight");
+            for (int i = 1; i < 12000; i++)
+                Equal(true, Math.Abs(SkyMotion.NightAmount(i / 100f) - SkyMotion.NightAmount((i - 1) / 100f)) < .003f,
+                    "night transitions have no visible jumps");
             Equal(true, SkyMotion.CloudX(10f, 100f, 1f) > SkyMotion.CloudX(0f, 100f, 1f), "clouds drift right");
             Equal(true, SkyMotion.CloudX(250f, 100f, 1f) < 0f, "cloud wraps outside view");
         }

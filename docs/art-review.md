@@ -52,3 +52,9 @@ Outline follow-up: closed exposed rim-highlight pixels in the authored bucket (a
 - Render the sky/cloud layer directly at display resolution behind the transparent native game canvas. Slow fractional cloud positions now move in screen-pixel increments instead of jumping a whole scaled game pixel; point sampling preserves the authored shapes. Scissor clipping keeps clouds within the play viewport. Diagnostic native captures still include the sky.
 - Removed the cash spawn director's persistent directional lane. Each note now chooses an independent spawn position; existing independent per-note flutter/momentum and soft boundary handling are preserved.
 - Verified the spawn regression fails before the change, then passes; Release build has zero warnings/errors, gameplay/difficulty tests pass. Browser screenshots show 1px cloud movement at 4x game scale. Pause freezes the scene; three mobile landscape sizes still fit; no browser errors.
+
+## Short run-based night (2026-11-02)
+
+Reintroduced night as one cool dark veil over the complete world (including sky, clouds, cash, bombs, character and effects), drawn before HUD/dialogs. No moon, stars or birds. The lamp ignites with a short dusk flicker and stays warm at night. Each 60-second run cycle has 30 seconds daylight, 12 seconds smooth dusk, 9 seconds full night and 9 seconds smooth dawn. Uses elapsed run time, already reset on retry and frozen during pause; menus do not consume the opening daylight. Maximum veil opacity is 55%, retaining bomb silhouette/fuse visibility.
+
+Verified cycle timing/continuity tests, zero-warning Release build, full gameplay/difficulty suite, daytime/dusk/night/dawn captures, browser asset/pause checks and mobile landscape sizing. Smooth display-resolution clouds remain intact.
