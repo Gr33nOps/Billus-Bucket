@@ -372,7 +372,10 @@ namespace GameTests
             Equal(1, feedback.Notes.Count, "stored money remains after animation");
             for (int i = 0; i < 20; i++) feedback.Collect(i % NoteCatalog.Count, 0f);
             Equal(5, feedback.Notes.Count, "visible stack stays bounded during long runs");
-            Equal(19 % NoteCatalog.Count, feedback.Notes[4], "stack keeps newest note colours");
+            var retainedPaper = feedback.Placements[1];
+            feedback.Collect(5, -6f);
+            Equal(retainedPaper, feedback.Placements[0], "existing paper stays put when the pile receives another note");
+            Equal(5, feedback.Notes[4], "stack keeps newest note colours");
             feedback.Reset();
             Equal(0, feedback.Notes.Count, "new run or bomb clears visual contents");
             Equal(0, feedback.ImpactOffset, "reset clears catch movement");

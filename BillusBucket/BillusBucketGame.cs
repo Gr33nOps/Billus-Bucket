@@ -1816,25 +1816,30 @@ namespace BillusBucket
             batch.Draw(bucketSprite, new Vector2(x, y), Color.White);
             float progress = bucketFeedback.CatchProgress;
             int count = bucketFeedback.Notes.Count;
-            int settledCount = progress < 1f ? count - 1 : count;
-            for (int i = 0; i < settledCount; i++)
+            for (int i = 0; i < count; i++)
             {
-                int sourceX = bucketFeedback.Notes[i] * NoteCatalog.FramesPerNote * NoteFrameWidth;
-                // Overlapping paper tops remain inside the opening, behind its front lip.
-                batch.Draw(cashSprite, new Rectangle(x + 3 + i * 3, y + 2 - i % 2, 8, 5),
-                    new Rectangle(sourceX, 0, NoteFrameWidth, NoteFrameHeight), Color.White);
-            }
-            if (count > 0 && progress < 1f)
-            {
-                float ease = 1f - (1f - progress) * (1f - progress);
-                int width = (int)MathF.Round(12f - ease * 4f);
-                int height = (int)MathF.Round(8f - ease * 3f);
-                float target = 3 + (count - 1) * 3 + 4;
-                int center = x + (int)MathF.Round(MathHelper.Lerp(14 + bucketFeedback.EntryOffset, target, ease));
-                int top = y + (int)MathF.Round(MathHelper.Lerp(-7f, 2 - (count - 1) % 2, ease));
-                int sourceX = bucketFeedback.Notes[count - 1] * NoteCatalog.FramesPerNote * NoteFrameWidth;
-                batch.Draw(cashSprite, new Rectangle(center - width / 2, top, width, height),
-                    new Rectangle(sourceX, 0, NoteFrameWidth, NoteFrameHeight), Color.White);
+                var paper = bucketFeedback.Placements[i];
+                bool entering = i == count - 1 && progress < 1f;
+                float offset = paper.Offset;
+                float height = 3f + paper.Depth;
+                float tilt = paper.Tilt;
+                float scale = 2f / 3f;
+                if (entering)
+                {
+                    // Drop near the catch point, then flop onto the pile.
+                    // Most movement is downward; no sideways trip to an assigned slot.
+                    float fall = Math.Min(1f, progress / .6f);
+                    float landing = Math.Clamp((progress - .6f) / .4f, 0f, 1f);
+                    offset = MathHelper.Lerp(bucketFeedback.EntryOffset * .65f, paper.Offset, progress);
+                    height = MathHelper.Lerp(-4f, height, fall * fall)
+                        - MathF.Sin(landing * MathF.PI) * 1.4f;
+                    tilt += MathF.Sin(progress * MathF.PI * 2f) * .22f;
+                    scale = MathHelper.Lerp(.9f, 2f / 3f, fall);
+                }
+                int sourceX = (bucketFeedback.Notes[i] * NoteCatalog.FramesPerNote + paper.Frame) * NoteFrameWidth;
+                batch.Draw(cashSprite, new Vector2(x + 14 + MathF.Round(offset), y + MathF.Round(height)),
+                    new Rectangle(sourceX, 0, NoteFrameWidth, NoteFrameHeight), Color.White,
+                    tilt, new Vector2(6f, 4f), new Vector2(scale, .625f), SpriteEffects.None, 0f);
             }
             // The front rim and body occlude the paper as it drops inside.
             batch.Draw(bucketSprite, new Vector2(x, y + 5), new Rectangle(0, 5, 28, 11), Color.White);

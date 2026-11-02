@@ -33,3 +33,5 @@ Matched the character's material shading to the detailed bucket using broad hair
 Caught notes animate down into the mouth, with a brief one-pixel dip/rebound in the bucket. Overlapping note tops in the caught denominations remain behind its front lip, showing a bounded stack of the latest five notes. The stack follows movement, freezes on pause and clears on a bomb/new run. Catch presentation does not move the hitbox or change scoring.
 
 Reviewed ready, carrying, both walking directions, pause, catch impact, full bucket and burned screenshots from the desktop renderer. Release build with warnings as errors, C# catch persistence/reset tests, atlas checks and desktop/mobile browser checks passed.
+
+Pile refinement: each paper now retains its own offset, fold and tilt when later notes arrive. Incoming notes fall near the catch point, flutter and briefly bounce into an uneven overlapping pile instead of sliding into evenly spaced slots. Reviewed full/impact renderer captures; gameplay checks and warnings-as-errors build passed.
