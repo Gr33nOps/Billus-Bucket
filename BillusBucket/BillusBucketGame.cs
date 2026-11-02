@@ -150,6 +150,7 @@ namespace BillusBucket
         private Texture2D pixel;
         private Texture2D background;
         private Texture2D cashSprite;
+        private Texture2D paperSilhouette;
         private Texture2D bombSprite;
         private Texture2D burnedBucketSprite;
         private Texture2D bucketSprite;
@@ -276,6 +277,12 @@ namespace BillusBucket
             background = LoadArt("rooftop.png");
             cashSprite = LoadArt("rupee-notes.png");
             notePopupColors = SampleNoteColors(cashSprite);
+            Color[] paperMask = new Color[cashSprite.Width * cashSprite.Height];
+            cashSprite.GetData(paperMask);
+            for (int i = 0; i < paperMask.Length; i++)
+                paperMask[i] = new Color(paperMask[i].A, paperMask[i].A, paperMask[i].A, paperMask[i].A);
+            paperSilhouette = new Texture2D(GraphicsDevice, cashSprite.Width, cashSprite.Height);
+            paperSilhouette.SetData(paperMask);
 
             bombSprite = LoadArt("bomb-sheet.png");
             burnedBucketSprite = LoadArt("bucket-burned.png");
@@ -365,6 +372,7 @@ namespace BillusBucket
             pixel?.Dispose();
             background?.Dispose();
             cashSprite?.Dispose();
+            paperSilhouette?.Dispose();
             bombSprite?.Dispose();
             burnedBucketSprite?.Dispose();
             bucketSprite?.Dispose();
@@ -1837,10 +1845,25 @@ namespace BillusBucket
                     scale = MathHelper.Lerp(.9f, 2f / 3f, fall);
                 }
                 int sourceX = (bucketFeedback.Notes[i] * NoteCatalog.FramesPerNote + paper.Frame) * NoteFrameWidth;
-                batch.Draw(cashSprite, new Vector2(x + 14 + MathF.Round(offset), y + MathF.Round(height)),
-                    new Rectangle(sourceX, 0, NoteFrameWidth, NoteFrameHeight), Color.White,
-                    tilt, new Vector2(6f, 4f), new Vector2(scale, .625f), SpriteEffects.None, 0f);
+                Vector2 paperPosition = new Vector2(x + 14 + MathF.Round(offset), y + MathF.Round(height));
+                Rectangle paperSource = new Rectangle(sourceX, 0, NoteFrameWidth, NoteFrameHeight);
+                Vector2 paperScale = new Vector2(scale, .625f);
+                // Rotation/downsampling can erase the source's one-pixel border.
+                // Restore a continuous outline on the final native pixel grid.
+                for (int edge = 0; edge < 4; edge++)
+                {
+                    Vector2 borderOffset = edge switch {
+                        0 => new Vector2(-1, 0), 1 => new Vector2(1, 0),
+                        2 => new Vector2(0, -1), _ => new Vector2(0, 1)
+                    };
+                    batch.Draw(paperSilhouette, paperPosition + borderOffset, paperSource, PanelInkColor,
+                        tilt, new Vector2(6f, 4f), paperScale, SpriteEffects.None, 0f);
+                }
+                batch.Draw(cashSprite, paperPosition, paperSource, Color.White,
+                    tilt, new Vector2(6f, 4f), paperScale, SpriteEffects.None, 0f);
             }
+            batch.Draw(bucketSprite, new Vector2(x, y), new Rectangle(0, 0, 4, 7), Color.White);
+            batch.Draw(bucketSprite, new Vector2(x + 24, y), new Rectangle(24, 0, 4, 7), Color.White);
             // The front rim and body occlude the paper as it drops inside.
             batch.Draw(bucketSprite, new Vector2(x, y + 5), new Rectangle(0, 5, 28, 11), Color.White);
         }

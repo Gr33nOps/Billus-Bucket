@@ -35,3 +35,5 @@ Caught notes animate down into the mouth, with a brief one-pixel dip/rebound in 
 Reviewed ready, carrying, both walking directions, pause, catch impact, full bucket and burned screenshots from the desktop renderer. Release build with warnings as errors, C# catch persistence/reset tests, atlas checks and desktop/mobile browser checks passed.
 
 Pile refinement: each paper now retains its own offset, fold and tilt when later notes arrive. Incoming notes fall near the catch point, flutter and briefly bounce into an uneven overlapping pile instead of sliding into evenly spaced slots. Reviewed full/impact renderer captures; gameplay checks and warnings-as-errors build passed.
+
+Outline follow-up: closed exposed rim-highlight pixels in the authored bucket (and matching favicon/carry atlas). Added a solid alpha-silhouette border at native resolution around rotated/scaled pile notes and restored side rim caps above them. Empty, impact and full-bucket renderer captures reviewed; closed-contour regression, Release build, gameplay tests and browser launch passed.

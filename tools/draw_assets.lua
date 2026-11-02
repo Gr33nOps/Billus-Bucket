@@ -61,6 +61,20 @@ oval(bucket,0,0,28,7,'ink');oval(bucket,2,1,24,5,'bluelight')
 oval(bucket,4,2,20,3,'ink')
 rect(bucket,4,5,20,1,'bluelight');rect(bucket,7,6,14,1,'blue')
 line(bucket,5,1,11,1,'rim')
+-- Close tiny stair-step gaps where the rim highlight met transparent sky.
+local rimGaps={}
+for y=0,15 do for x=0,27 do
+ local c=bucket:getPixel(x,y)
+ if c~=0 and c~=col('ink') then
+  for _,d in ipairs({{-1,0},{1,0},{0,-1},{0,1}}) do
+   local nx,ny=x+d[1],y+d[2]
+   if nx<0 or nx>27 or ny<0 or ny>15 or bucket:getPixel(nx,ny)==0 then
+    rimGaps[#rimGaps+1]={x,y};break
+   end
+  end
+ end
+end end
+for _,p in ipairs(rimGaps) do px(bucket,p[1],p[2],'ink') end
 saveFrames('bucket',{bucket},28,16)
 -- Square browser icon: preserve the exact game's 28x16 bucket proportions.
 local favicon=img(32,32);paste(favicon,bucket,2,8)

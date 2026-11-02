@@ -37,3 +37,12 @@ for i in range(12):
 for i in range(24):
  assert sheet.crop((i*32,16,i*32+32,44)).tobytes()==sheet.crop((i*32,64,i*32+32,92)).tobytes(),('body layer mismatch',i)
 print('Separate body rendering preserves every character frame.')
+
+# Every coloured bucket edge has a continuous dark contour.
+for y in range(bucket.height):
+ for x in range(bucket.width):
+  c=bucket.getpixel((x,y))
+  if c[3] and c!=ink:
+   assert all(0<=x+dx<bucket.width and 0<=y+dy<bucket.height and bucket.getpixel((x+dx,y+dy))[3]
+              for dx,dy in [(-1,0),(1,0),(0,-1),(0,1)]),('exposed bucket colour',x,y)
+print('Bucket outer contour is closed.')
