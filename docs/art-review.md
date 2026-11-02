@@ -82,3 +82,7 @@ Revised timing tests failed before the change and pass after; zero-warning Relea
 ## Pickup impact revision (2026-11-02)
 
 Added a short cushioned 260Hz contact beneath a filtered paper fold, 140ms overall. Raised catch peak to .44 and runtime gain to .46; narrowed denomination pitch variation to +/- .12 octaves to avoid chirp/thud extremes. No metallic partials or long noise tail. Verified waveform endpoints, headroom including four overlapping pickups, duration, zero-warning Release build and gameplay suite. Created seven-value audio preview with an overlap sequence. No subjective listening claim: this environment does not provide auditory inspection.
+
+## Arcade pickup cue (2026-11-02)
+
+Replaced paper/impact synthesis with a rounded two-note rising fifth (C5/G5), 210ms, peak .40, retaining restrained denomination pitch variation. No noise or metallic synthesis. Verified clean endpoints, four overlapping pickups peak .351 at runtime gain, zero-warning build. Auditory quality requires user listening; preview provided.
