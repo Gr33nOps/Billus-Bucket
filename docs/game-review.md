@@ -20,3 +20,9 @@
 - All 13 PNGs decode correctly. All eight WAVs decode and contain no saturated 16-bit samples. No visual asset changes were required in the inspected ready/playing/paused layouts.
 
 These checks establish the tested behaviors; they cannot guarantee absence of every bug or replace testing on physical phones and other browser engines.
+
+## Random note wind — 2026-11-02
+
+Replaced periodic sideways waves and reflected side-wall motion with seeded, smooth random drift targets. Successive moves can continue left or right or change direction, with a different pacing per note. Drift is limited to 56 native pixels from spawn and to the existing inset catch-area bounds (which allow the rotated sprite to remain visible). The targets stay inside those limits, eliminating invisible-wall bounces. Rotation follows sideways motion with a small flutter; vertical fall speed and bomb behaviour retain their existing tuning.
+
+Regression checks cover continued motion in both directions, reversals, frame-rate independence, positive fall speed, bounded displacement, chaseable sideways speed and smooth edge turns across seeded falls. Release build, gameplay/difficulty tests and desktop/mobile browser checks passed.

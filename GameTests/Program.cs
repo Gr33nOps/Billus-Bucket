@@ -402,6 +402,42 @@ namespace GameTests
                 Equal(true, edgeNote.X >= 59f && edgeNote.X <= 259f, "gusts keep notes inside the play area");
             }
 
+            int continuesLeft = 0, continuesRight = 0, reverses = 0;
+            for (int seed = 0; seed < 200; seed++)
+            {
+                DropMotion varied = new DropMotion(DropKind.Cash, 160f, -12f, 35f,
+                    seed, left: 59f, right: 259f);
+                varied.Update(.9f);
+                float first = varied.X - 160f;
+                float prior = varied.X;
+                varied.Update(.9f);
+                float second = varied.X - prior;
+                if (first < -2f && second < -2f) continuesLeft++;
+                if (first > 2f && second > 2f) continuesRight++;
+                if (first * second < -4f) reverses++;
+            }
+            Equal(true, continuesLeft > 10 && continuesRight > 10 && reverses > 10,
+                "notes can continue in either direction as well as change direction");
+
+            // Invisible side walls must not cause instant velocity reversals.
+            for (int seed = 0; seed < 80; seed++)
+            {
+                DropMotion softEdge = new DropMotion(DropKind.Cash, 60f, -12f, 35f,
+                    seed, left: 59f, right: 259f);
+                float priorVelocity = 0f;
+                for (int frame = 0; frame < 600; frame++)
+                {
+                    float priorX = softEdge.X;
+                    softEdge.Update(1f / 120f);
+                    float velocity = (softEdge.X - priorX) * 120f;
+                    Equal(true, Math.Abs(velocity) < 135f, "note drift remains chaseable");
+                    if (frame > 1)
+                        Equal(true, Math.Abs(velocity - priorVelocity) < 15f,
+                            "wind turns smoothly instead of bouncing off side walls");
+                    priorVelocity = velocity;
+                }
+            }
+
             DropMotion cash = new DropMotion(DropKind.Cash, 100f, 0f, 72f);
             DropMotion bomb = new DropMotion(DropKind.Bomb, 100f, 0f, 118f);
             cash.Update(1f);

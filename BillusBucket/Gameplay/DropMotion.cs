@@ -25,7 +25,10 @@ namespace BillusBucket
 
         private readonly float phase;
         private readonly float frequency;
-        private readonly float amplitude;
+        private readonly float driftPeriod;
+        private readonly float driftLeft;
+        private readonly float driftRight;
+        private readonly uint windSeed;
         private readonly float flutterRate;
 
         public DropKind Kind { get; }
@@ -68,7 +71,12 @@ namespace BillusBucket
             Random random = seed.HasValue ? new Random(seed.Value) : Random.Shared;
             phase = (float)random.NextDouble() * MathF.PI * 2f;
             frequency = 1.5f + (float)random.NextDouble() * 1.7f;
-            amplitude = 10f + (float)random.NextDouble() * 5f;
+            driftPeriod = 1.25f + (float)random.NextDouble() * .6f;
+            windSeed = (uint)random.Next();
+            // Leave space for the rotated 12x8 note at both edges. Wind targets
+            // lie inside these limits, so the note never needs a wall bounce.
+            driftLeft = Math.Max(x - 56f, left);
+            driftRight = Math.Min(x + 56f, right);
             flutterRate = 4f + (float)random.NextDouble() * 6f;
         }
 
@@ -88,48 +96,44 @@ namespace BillusBucket
                 return;
             }
 
-            // Combine slow drift, quick flutter, and broader wind gusts so each note feels alive.
-            float slowWave = MathF.Sin(Age * frequency * 0.65f + phase) - MathF.Sin(phase);
-            float quickFlutter = MathF.Sin(Age * frequency * 1.7f + phase * 2f) - MathF.Sin(phase * 2f);
+            // Fresh seeded wind points, rather than a repeating oscillation.
+            // Consecutive targets may continue left/right or reverse direction.
+            float progress = Age / driftPeriod;
+            int segment = (int)Math.Min((double)progress, int.MaxValue - 1);
+            float t = Math.Clamp(progress - segment, 0f, 1f);
+            float from = WindPoint(segment);
+            float to = WindPoint(segment + 1);
+            float blend = t * t * (3f - 2f * t);
+            X = from + (to - from) * blend;
 
-            float gustFrequency = 0.8f + frequency * 0.18f;
-            float shiftedTime = Age + phase;
-            float windGust = 28f * (MathF.Sin(shiftedTime * gustFrequency) - MathF.Sin(phase * gustFrequency));
-
-            float rawX = startX + amplitude * slowWave + 3f * quickFlutter + windGust;
-            X = ReflectWithinBounds(rawX, leftBound, rightBound);
-
-            Rotation = 0.42f * MathF.Cos(shiftedTime * gustFrequency)
-                     + 0.30f * MathF.Sin(Age * frequency * 1.7f + phase);
+            float sidewaysSpeed = (to - from) * 6f * t * (1f - t) / driftPeriod;
+            Rotation = Math.Clamp(sidewaysSpeed / 130f, -.45f, .45f)
+                     + .18f * MathF.Sin(Age * frequency * 1.7f + phase);
 
             // Compute Y directly from Age so fall distance stays identical at any frame rate.
             float verticalFlutter = (0.12f / frequency) * (MathF.Sin(Age * frequency + phase) - MathF.Sin(phase));
             Y = startY + speed * (Age + verticalFlutter);
         }
 
-        private static float ReflectWithinBounds(float rawX, float left, float right)
+        private float WindPoint(int index)
         {
-            if (!float.IsFinite(left) || !float.IsFinite(right))
+            if (rightBound <= leftBound)
+                return leftBound;
+            if (index == 0)
+                return Math.Clamp(startX, driftLeft, driftRight);
+
+            // Stateless hash: identical motion at all frame rates, including
+            // skipped frames; no per-frame randomness or integration drift.
+            uint value;
+            unchecked
             {
-                return rawX;
+                value = windSeed + (uint)index * 0x9e3779b9u;
+                value = (value ^ (value >> 16)) * 0x7feb352du;
+                value = (value ^ (value >> 15)) * 0x846ca68bu;
+                value ^= value >> 16;
             }
-
-            if (right <= left)
-            {
-                return left;
-            }
-
-            // Bounce wind gusts off the invisible side margins instead of pinning notes flat against the edge.
-            float width = right - left;
-            float doubleWidth = 2f * width;
-            float wrapped = ((rawX - left) % doubleWidth + doubleWidth) % doubleWidth;
-
-            if (wrapped <= width)
-            {
-                return left + wrapped;
-            }
-
-            return left + (doubleWidth - wrapped);
+            float roll = (value >> 8) / 16777215f;
+            return driftLeft + (driftRight - driftLeft) * roll;
         }
     }
 }
