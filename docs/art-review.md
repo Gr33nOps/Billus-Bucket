@@ -23,3 +23,5 @@ The muted distant scenery, distinct cloud silhouettes, banknote colours, plant/p
 Visual review covers these assets and states; artistic preference still benefits from feedback during play.
 
 Follow-up: closed the two teal gaps at the scarf neck edge in both directions; added matching shirt hems, trouser folds and tank-like bucket reflections. Directional scarf and outline regression checks pass in every walk frame.
+
+Face/readability follow-up: ranking numbers now remain visible on the highlighted player row. Removed the single side-pose tooth, closed the nose-to-sleeve contour, simplified clothing/hair highlights, and added independent brief blinking with matching eye frames for every gait. Release build, C# tests, atlas checks and Chromium UI review passed.

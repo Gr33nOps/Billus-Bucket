@@ -20,11 +20,13 @@ namespace BillusBucket
         private const int WalkFrameCount = 4;
 
         private float stateTime;
+        private float blinkTime;
 
         public BilluAction Action { get; private set; } = BilluAction.Straight;
 
-        public int SpriteFrame => Action == BilluAction.WalkLeft ? 8 + Frame
-            : Action == BilluAction.WalkRight ? 4 + Frame : 0;
+        public int SpriteFrame => (Action == BilluAction.WalkLeft ? 8 + Frame
+            : Action == BilluAction.WalkRight ? 4 + Frame : 0)
+            + (blinkTime >= 3.2f && blinkTime < 3.34f ? 12 : 0);
 
         public int Frame
         {
@@ -46,6 +48,8 @@ namespace BillusBucket
             {
                 return;
             }
+
+            blinkTime = (blinkTime + seconds) % 3.7f;
 
             // Once burned by a bomb, Billu stays burned until the run resets.
             if (Action == BilluAction.Burned)
@@ -81,6 +85,7 @@ namespace BillusBucket
         {
             Action = BilluAction.Straight;
             stateTime = 0f;
+            blinkTime = 0f;
         }
 
         private void SetAction(BilluAction nextAction)

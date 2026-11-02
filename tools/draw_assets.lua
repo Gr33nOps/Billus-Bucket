@@ -86,7 +86,7 @@ saveFrames('bucket-burned',{wreck},28,16)
 -- Character: 24x32. Body, arms, and expression are authored at native size.
 local function simplifyBillu(a)
  -- Larger flat color groups match the props; keep expressive eyes and silhouette.
- local merge={{'skinlight','skin'},{'goldlight','gold'}}
+ local merge={{'skinlight','skin'},{'goldlight','gold'},{'teallight','teal'},{'pantslight','pants'},{'hairlight','hair'}}
  for y=0,a.height-1 do for x=0,a.width-1 do
   local c=a:getPixel(x,y)
   for _,pair in ipairs(merge) do if c==col(pair[1]) then px(a,x,y,pair[2]);break end end
@@ -145,7 +145,13 @@ local function sideWalk(step,left)
  line(a,8,4,12,3,'hairlight')
  rect(a,13,8,4,1,'skinshade')
  rect(a,13,9,4,2,'white');rect(a,15,9,2,2,'ink')
- px(a,9,11,'skinshade');rect(a,14,13,3,1,'ink');px(a,15,13,'white')
+ px(a,9,11,'skinshade')
+ -- Closed smile: no isolated tooth at this tiny scale.
+ line(a,14,13,16,13,'ink')
+ -- Continuous cheek/nose boundary separates skin from the raised sleeve.
+ line(a,18,7,18,9,'ink');line(a,19,9,20,9,'ink')
+ line(a,20,10,20,12,'ink');line(a,18,12,19,12,'ink')
+ line(a,18,13,18,14,'ink')
  -- Scarf belongs to the torso: turn its neck band, tail and outline together.
  line(a,9,16,17,16,'ink');line(a,10,17,16,17,'gold')
  line(a,9,18,14,18,'ink')
@@ -159,21 +165,8 @@ local function sideWalk(step,left)
   for y=0,31 do for x=0,23 do turned:drawPixel(23-x,y,a:getPixel(x,y)) end end
   a=turned
  end
- -- A short shirt hem and trouser fold use the same restrained prop shading.
+ -- One broad hem shadow keeps the cloth simple.
  for x=10,14 do if a:getPixel(x,22)==col('teal') then px(a,x,22,'tealshade') end end
- for y=25,27 do for x=8,16 do
-  if a:getPixel(x,y)==col('pants') and a:getPixel(x-1,y)==col('ink') then px(a,x,y,'pantslight') end
- end end
- -- Keep highlights on the world-facing upper-left surfaces.
- for y=18,22 do
-  for x=7,17 do
-   if a:getPixel(x,y)==col('teallight') then px(a,x,y,'teal') end
-  end
- end
- for y=19,21 do
-  local hx=left and 10 or 11
-  if a:getPixel(hx,y)==col('teal') or a:getPixel(hx,y)==col('tealshade') then px(a,hx,y,'teallight') end
- end
  return outlineBillu(simplifyBillu(a))
 end
 local function billu(side,step,burn)
@@ -262,7 +255,19 @@ for row=0,2 do for f=0,3 do
  paste(a,body,4,12);paste(a,bucket,2,0)
  carry[#carry+1]=a
 end end
-saveFrames('billu-carry',carry,32,48,{{'straight',1,4},{'walk-right',5,8},{'walk-left',9,12}})
+-- Matching closed-eye frames keep blinking independent from foot contacts.
+for i=1,12 do
+ local a=carry[i]:clone()
+ if i<=4 then
+  rect(a,11,21,4,2,'skin');rect(a,17,21,4,2,'skin')
+  line(a,11,22,14,22,'ink');line(a,17,22,20,22,'ink')
+ else
+  local eyeX=i<=8 and 17 or 11
+  rect(a,eyeX,21,4,2,'skin');line(a,eyeX,22,eyeX+3,22,'ink')
+ end
+ carry[#carry+1]=a
+end
+saveFrames('billu-carry',carry,32,48,{{'straight',1,4},{'walk-right',5,8},{'walk-left',9,12},{'blink',13,24}})
 local burned=billu(false,0,true);local blink=burned:clone();rect(blink,7,9,4,2,'soot');rect(blink,13,9,4,2,'soot');rect(blink,7,10,4,1,'ash');rect(blink,13,10,4,1,'ash')
 saveFrames('billu-burned',{burned,blink},24,32,{{'cry',1,2}})
 saveFrames('billu-body',{billu(false,0,false)},24,32)

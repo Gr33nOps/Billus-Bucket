@@ -2141,7 +2141,7 @@ namespace BillusBucket
                                 ? ScoreValueColor
                                 : ButtonTextColor;
 
-                    DrawText(entry.IsCurrentPlayer ? "YOU" : entry.Rank + ".", new Vector2(62f, rowY), rowColor, scale: 1);
+                    DrawText(entry.Rank + ".", new Vector2(62f, rowY), rowColor, scale: 1);
                     DrawText(entry.DisplayName, new Vector2(84f, rowY), rowColor, scale: 1);
 
                     string scoreText = FitCompactRupeeAmount(entry.Score, 84);

@@ -318,6 +318,11 @@ namespace GameTests
 
         private static void TestBilluAnimator()
         {
+            BilluAnimator blinkCheck = new BilluAnimator();
+            blinkCheck.Update(3.3f, 20f);
+            Equal(true, blinkCheck.SpriteFrame >= 12, "walking eyes blink independently of gait");
+            blinkCheck.Update(0.2f, -20f);
+            Equal(true, blinkCheck.SpriteFrame < 12, "eyes reopen after brief blink");
             BilluAnimator billu = new BilluAnimator();
             Equal(BilluAction.Straight, billu.Action, "Billu faces forward while still");
             billu.Update(0.15f, 3f);
@@ -1200,3 +1205,4 @@ namespace GameTests
         }
     }
 }
+
