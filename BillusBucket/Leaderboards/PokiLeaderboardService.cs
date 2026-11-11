@@ -38,7 +38,7 @@ namespace BillusBucket
                     safeStorage,
                     approvedExternalTransport,
                     sourcePlatform: "poki",
-                    providerName: "POKI WEEKLY");
+                    providerName: "POKI LEADERBOARD");
             }
             else
             {

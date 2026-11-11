@@ -38,7 +38,7 @@ dotnet run --project BillusBucket
 - `BillusBucket/Leaderboards/`, `Persistence/`, and `Platform/` — Online scores, saves, and desktop/browser support
 - `BillusBucket.Web/` — HTML5 / WebAssembly browser target using KNI BlazorGL (`net9.0`) + JS bridge for CrazyGames SDK v3, Poki SDK v2, and safe `localStorage`
 - `GameTests/` — Automated unit tests for gameplay physics, scoring, leaderboard adapters, platform policies, and 100-seed 5-minute difficulty checks
-- `backend/cloudflare/` — Active Workers + D1 weekly leaderboard, custom names, Save Code profiles, schema and migrations
+- `backend/cloudflare/` — Active Workers + D1 all-time leaderboard, custom names, Save Code profiles, schema and migrations
 - `tools/deploy_cloudflare_leaderboard.ps1` — Cloudflare provisioning and migration/deployment helper
 - `backend/supabase/` — Optional shared weekly Top-10 leaderboard Postgres schema (`schema.sql`) and Edge Function (`functions/leaderboard/index.ts`)
 - `tools/publish_web.ps1` — Builds portal-specific static WebAssembly bundles (`local`, `web`, `crazygames`, `poki`)

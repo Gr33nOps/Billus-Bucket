@@ -168,7 +168,7 @@ namespace BillusBucket
                 {
                     return new SharedLeaderboardRemoteResponse(
                         false,
-                        errorMessage: FriendlyHttpError(response.StatusCode, json, "WEEKLY BOARD UNAVAILABLE"));
+                        errorMessage: FriendlyHttpError(response.StatusCode, json, "LEADERBOARD UNAVAILABLE"));
                 }
 
                 return ParseResponseJson(json);

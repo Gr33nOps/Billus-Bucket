@@ -28,6 +28,6 @@ The leaderboard stays in the existing `billus-bucket-leaderboard` Worker and its
 
 ## Existing profiles
 
-Browsers keep local storage separate for each website. A name or best score saved only on the GitHub address does not automatically appear on the Cloudflare address. Use the leaderboard's Save Code to reconnect an existing cloud profile on the new site. Weekly online rankings use the same database.
+Browsers keep local storage separate for each website. A name or best score saved only on the GitHub address does not automatically appear on the Cloudflare address. Use the leaderboard's Save Code to reconnect an existing cloud profile on the new site. All-time online rankings use the same database and never reset.
 
 Cloudflare references: [static asset configuration](https://developers.cloudflare.com/workers/static-assets/binding/) and [static asset serving](https://developers.cloudflare.com/workers/static-assets/get-started/).

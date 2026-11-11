@@ -67,3 +67,8 @@ CREATE TABLE IF NOT EXISTS leaderboard_rate_limits (
 
 CREATE INDEX IF NOT EXISTS idx_rate_limits_window
     ON leaderboard_rate_limits (window_minute);
+
+-- Permanent ranking; weekly rows remain an archive for older clients.
+CREATE INDEX IF NOT EXISTS idx_profiles_all_time_ranking
+    ON player_profiles (all_time_best DESC, created_at ASC, player_hash ASC)
+    WHERE all_time_best > 0;

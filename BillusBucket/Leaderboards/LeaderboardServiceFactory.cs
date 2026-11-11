@@ -49,7 +49,7 @@ namespace BillusBucket
                     safeStorage,
                     sharedTransport,
                     sourcePlatform: platform,
-                    providerName: "WEEKLY ONLINE");
+                    providerName: "ONLINE LEADERBOARD");
             }
 
             return new LocalLeaderboardService(safeStorage);

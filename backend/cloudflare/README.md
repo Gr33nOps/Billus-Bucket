@@ -1,4 +1,4 @@
-# Cloudflare Workers + D1 Weekly Leaderboard Backend
+# Cloudflare Workers + D1 All-Time Leaderboard Backend
 
 Free, **never-pausing** serverless SQLite leaderboard backend for **Billu's Bucket** (100,000 requests/day + 5 GB D1 storage on Cloudflare's Free plan, no credit card required, and never auto-pauses when idle).
 
@@ -50,6 +50,10 @@ After running it, commit and push `BillusBucket.Web/wwwroot/platform-config.js` 
    - Commit and push to `main` to publish to GitHub Pages.
 
 ## Upgrading an existing database
+
+The live board ranks permanent personal bests and never resets. The response includes `scope: "all-time"`. Tied scores use profile creation time, then player hash, for a stable order. Legacy weekly rows remain archived.
+
+For an existing profile-enabled database, apply `migrations/0003_all_time_leaderboard.sql` before deploying the updated Worker. It recovers historical bests without removing archived scores or replacing custom names. Fresh databases use `schema.sql`.
 
 Use the deployment script, which runs `wrangler d1 migrations apply` before deploying the Worker. For a dashboard-only upgrade from the original backend, run `migrations/0002_profiles_and_custom_names.sql` once before deploying the profile-enabled Worker. Re-running `schema.sql` alone does not update existing table constraints.
 

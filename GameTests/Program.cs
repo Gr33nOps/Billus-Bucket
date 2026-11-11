@@ -403,7 +403,9 @@ namespace GameTests
             Equal(8f, feedback.EntryOffset, "entering note stays inside rim");
             Equal(true, feedback.CatchProgress < 1f, "catch starts a settling animation");
             feedback.Update(.15f);
-            Equal(1, feedback.ImpactOffset, "landing nudges bucket down");
+            Equal(0, feedback.ImpactOffset, "catching paper keeps the bucket steady");
+            feedback.Update(.06f);
+            Equal(0, feedback.ImpactOffset, "settling paper does not lift the bucket");
             feedback.Update(1f);
             Equal(0, feedback.ImpactOffset, "bucket settles back after catch");
             Equal(1f, feedback.CatchProgress, "incoming note finishes settling");

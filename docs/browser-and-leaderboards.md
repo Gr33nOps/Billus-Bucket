@@ -18,7 +18,7 @@ Core gameplay depends only on `ILeaderboardService` and `IGamePlatformBridge`. `
 | `activePlatform` | Active `ILeaderboardService` | Behavior |
 |---|---|---|
 | `"local"` / `"desktop"` | `LocalLeaderboardService` | Saves Personal Best locally (`leaderboard.json` on desktop, safe `localStorage` in browser with session-memory fallback). Never displays fake global rankings. |
-| `"web"` (with `sharedLeaderboardEnabled: true`) | `SharedOnlineLeaderboardService` | Saves Personal Best locally + submits completed runs once per `runId` to the configured shared leaderboard API (`backend/cloudflare/` Cloudflare Worker + D1 SQLite, or `backend/supabase/` Supabase Edge Function) and displays Weekly Top 10 + player weekly rank. Degrades gracefully to local mode when offline. |
+| `"web"` (with `sharedLeaderboardEnabled: true`) | `SharedOnlineLeaderboardService` | Saves Personal Best locally + submits completed runs once per `runId` to the configured shared leaderboard API (`backend/cloudflare/` Cloudflare Worker + D1 SQLite, or `backend/supabase/` Supabase Edge Function) and displays the all-time Top 10 + player rank with the active Cloudflare backend. Degrades gracefully to local mode when offline. |
 | `"crazygames"` | `CrazyGamesLeaderboardService` | Always tracks Personal Best locally. Submits AES-GCM encrypted scores via `window.CrazyGames.SDK.user.submitScore` **only** when `crazyGamesLeaderboardEnabled: true` and an encryption key is configured. Optionally pairs with the shared Top-10 backend if enabled. |
 | `"poki"` | `PokiLeaderboardService` | **Zero external network requests by default** (`pokiApprovedExternalLeaderboardEnabled: false`) to comply with Poki's strict Content-Security-Policy (CSP). Enables the shared online backend **only** when `pokiApprovedExternalLeaderboardEnabled: true` after Poki approves your domain and Privacy Policy. |
 
@@ -31,11 +31,13 @@ Core gameplay depends only on `ILeaderboardService` and `IGamePlatformBridge`. `
 
 ## 3. Shared Online Leaderboard Backends (Cloudflare Workers + D1 or Supabase)
 
-Both backends support the weekly-score JSON protocol (`GET ?limit=10&playerId=...` and `POST { runId, playerId, displayName, score, durationSeconds, platform }`):
+Both backends support the score JSON protocol (`GET ?limit=10&playerId=...` and `POST { runId, playerId, displayName, score, durationSeconds, platform }`):
 - **Recommended free non-pausing backend (`backend/cloudflare/`)**: **Cloudflare Workers + Cloudflare D1 (SQLite)**. Requires no credit card, never auto-pauses when idle, needs zero client API keys (`sharedLeaderboardPublicKey: ""`), and can be deployed in one command via `pwsh ./tools/deploy_cloudflare_leaderboard.ps1` (see `backend/cloudflare/README.md`).
 - **Alternative PostgreSQL backend (`backend/supabase/`)**: **Supabase (Postgres + Edge Function)**.
 
 ### Cloud profiles
+
+The active Cloudflare board ranks permanent personal bests with no weekly reset. C# transport members named `WeeklyTop10` are retained for compatibility with older adapters; Cloudflare fills them with all-time rankings.
 
 Custom names, profile backups, and cross-device Save Codes currently require the Cloudflare backend. The optional Supabase backend supports weekly scores only; it does not implement `save_profile` or `restore_profile`. Google Play Games and Apple Game Center authentication are not implemented.
 
@@ -54,7 +56,7 @@ A small **Supabase (Postgres + Edge Function)** backend is well suited for a lig
 
 **Remaining risks inherent to client-authoritative HTML5 games**:
 - Because drop physics run client-side in WebAssembly (with random note rolls and player input), a determined attacker inspecting browser memory or forging HTTP requests can still submit a fabricated score that satisfies `score % 10 === 0` and waits out a plausible `durationSeconds` within the rate limit.
-- **Mitigation if high-stakes competition is ever added**: Record deterministic seed + timestamped input frames per run and replay `DropDirector` + `DropMotion` + `BucketControl` inside a server verifier before accepting Top-10 scores. For a casual arcade leaderboard with weekly resets and zero monetary prizes, rate-limited plausibility bounds keep maintenance simple while deterring casual script tampering.
+- **Mitigation if high-stakes competition is ever added**: Record deterministic seed + timestamped input frames per run and replay `DropDirector` + `DropMotion` + `BucketControl` inside a server verifier before accepting Top-10 scores. For a casual arcade leaderboard with zero monetary prizes, rate-limited plausibility bounds keep maintenance simple while deterring casual script tampering.
 
 ---
 

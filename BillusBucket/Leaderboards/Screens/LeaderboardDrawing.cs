@@ -43,7 +43,7 @@ namespace BillusBucket
             BigInteger bestScore = BigInteger.Max(GetCurrentBestScore(), snapshot.PersonalBest);
             string playerName = leaderboardService?.PlayerDisplayName ?? "PLAYER";
             DrawCenteredText(
-                capabilities?.SupportsWeeklyTop10 == true ? "WEEKLY TOP 10" : "PERSONAL BEST",
+                "LEADERBOARD",
                 y: 17f,
                 WarmTitleColor,
                 scale: 1
@@ -67,7 +67,7 @@ namespace BillusBucket
             DrawRect(panel.X + 10, 38, panel.Width - 20, 1, PanelTimberColor);
             if (snapshot.IsLoading && snapshot.WeeklyTop10.Count == 0)
             {
-                DrawCenteredText("LOADING WEEKLY SCORES...", y: 84f, HudLabelColor, scale: 1);
+                DrawCenteredText("LOADING SCORES...", y: 84f, HudLabelColor, scale: 1);
             }
             else if (snapshot.WeeklyTop10.Count > 0)
             {
@@ -97,7 +97,7 @@ namespace BillusBucket
                 }
                 else
                 {
-                    secondaryStatus = "ONLINE WEEKLY BOARD INACTIVE";
+                    secondaryStatus = "ONLINE BOARD INACTIVE";
                 }
 
                 DrawCenteredText(FitLeaderboardStatus(primaryStatus), y: 78f, ButtonTextColor, scale: 1);

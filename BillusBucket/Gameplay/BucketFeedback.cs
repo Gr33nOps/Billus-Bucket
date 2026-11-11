@@ -21,23 +21,8 @@ namespace BillusBucket
         public float EntryOffset { get; private set; }
         public float CatchProgress => Math.Clamp(catchAge / .28f, 0f, 1f);
 
-        public int ImpactOffset
-        {
-            get
-            {
-                // Screen Y grows downward: +1 dips the bucket, -1 lifts it back up.
-                if (catchAge >= .12f && catchAge < .19f)
-                {
-                    return 1;
-                }
-                else if (catchAge >= .19f && catchAge < .24f)
-                {
-                    return -1;
-                }
-
-                return 0;
-            }
-        }
+        // Paper settles inside the rim without bouncing the bucket or Billu.
+        public int ImpactOffset => 0;
 
         public void Collect(int noteIndex, float offset)
         {

@@ -1,5 +1,5 @@
 // ============================================================================
-// Billu's Bucket — Cloudflare Worker + D1 Weekly Leaderboard & Cloud Profile API
+// Billu's Bucket — Cloudflare Worker + D1 All-Time Leaderboard & Cloud Profile API
 // ============================================================================
 // Zero external npm runtime dependencies. Supports:
 //   - Custom player names (2..12 chars, profanity-filtered for App Store / portal UGC safety)
@@ -326,21 +326,23 @@ async function checkRateLimit(db, bucketKey, maxPerMinute, nowMs) {
   return hitCount <= maxPerMinute;
 }
 
-async function getWeeklyLeaderboardSnapshot(db, weekStart, playerHash, limit) {
+// Rank permanent bests. Profile creation time gives tied scores a stable order,
+// even after a rename or a lower-scoring run. Weekly rows remain a legacy archive.
+async function getLeaderboardSnapshot(db, playerHash, limit) {
   const safeLimit = Math.min(10, Math.max(1, Math.floor(Number(limit) || 10)));
   const topResult = await db.prepare(
     `WITH labels AS (
-       SELECT player_hash, best_score, submitted_at,
+       SELECT player_hash, all_time_best AS best_score, created_at AS submitted_at,
          CASE WHEN display_name GLOB 'BILLU_[1-9][0-9][0-9][0-9]'
            THEN 'GUEST_' || substr(display_name, 7) ELSE display_name END AS display_name
-       FROM weekly_leaderboard_scores WHERE week_start = ?
+       FROM player_profiles WHERE all_time_best > 0
      )
      SELECT *, COUNT(*) OVER (PARTITION BY display_name) AS name_count,
        ROW_NUMBER() OVER (ORDER BY player_hash) AS player_number
      FROM labels
      ORDER BY best_score DESC, submitted_at ASC, player_hash ASC
      LIMIT ?`,
-  ).bind(weekStart, safeLimit).all();
+  ).bind(safeLimit).all();
 
   const rows = Array.isArray(topResult?.results) ? topResult.results : [];
   let playerRank = null;
@@ -367,23 +369,22 @@ async function getWeeklyLeaderboardSnapshot(db, weekStart, playerHash, limit) {
 
   if (playerHash && playerRank === null) {
     const playerRow = await db.prepare(
-      `SELECT best_score, submitted_at
-       FROM weekly_leaderboard_scores
-       WHERE week_start = ? AND player_hash = ?`,
-    ).bind(weekStart, playerHash).first();
+      `SELECT all_time_best AS best_score, created_at AS submitted_at
+       FROM player_profiles
+       WHERE all_time_best > 0 AND player_hash = ?`,
+    ).bind(playerHash).first();
 
     if (playerRow) {
       const rankRow = await db.prepare(
         `SELECT 1 + COUNT(*) AS rank_pos
-         FROM weekly_leaderboard_scores
-         WHERE week_start = ?
+         FROM player_profiles
+         WHERE all_time_best > 0
            AND (
-             best_score > ?
-             OR (best_score = ? AND submitted_at < ?)
-             OR (best_score = ? AND submitted_at = ? AND player_hash < ?)
+             all_time_best > ?
+             OR (all_time_best = ? AND created_at < ?)
+             OR (all_time_best = ? AND created_at = ? AND player_hash < ?)
            )`,
       ).bind(
-        weekStart,
         playerRow.best_score,
         playerRow.best_score,
         playerRow.submitted_at,
@@ -415,7 +416,7 @@ async function getWeeklyLeaderboardSnapshot(db, weekStart, playerHash, limit) {
   }
 
   return {
-    weekStart,
+    scope: "all-time",
     playerRank,
     displayName: profileDisplayName,
     personalBest: profileAllTimeBest,
@@ -527,9 +528,8 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
           const playerHash = normalizedToken
             ? await resolveCanonicalPlayerHash(db, hashSalt, normalizedToken, url.searchParams.get("playerId"))
             : "";
-          const snapshot = await getWeeklyLeaderboardSnapshot(
+          const snapshot = await getLeaderboardSnapshot(
             db,
-            weekStart,
             playerHash,
             limit,
           );
@@ -641,9 +641,8 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
               ).bind(checkedName.name, weekStart, playerHash),
             ]);
 
-            const snapshot = await getWeeklyLeaderboardSnapshot(
+            const snapshot = await getLeaderboardSnapshot(
               db,
-              weekStart,
               playerHash,
               10,
             );
@@ -732,9 +731,8 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
               );
             }
 
-            const snapshot = await getWeeklyLeaderboardSnapshot(
+            const snapshot = await getLeaderboardSnapshot(
               db,
-              weekStart,
               playerHash,
               10,
             );
@@ -948,9 +946,8 @@ export function createCloudflareLeaderboardHandler(clock = () => Date.now()) {
         }
 
         try {
-          const snapshot = await getWeeklyLeaderboardSnapshot(
+          const snapshot = await getLeaderboardSnapshot(
             db,
-            weekStart,
             playerHash,
             10,
           );

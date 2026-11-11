@@ -25,7 +25,6 @@ namespace BillusBucket
         private static readonly Color PanelTimberColor = new Color(114, 86, 97);
         private static readonly Color PanelFaceColor = new Color(81, 67, 82);
         private static readonly Color PanelTopTrimColor = new Color(173, 128, 128);
-        private static readonly Color PanelTopGlintColor = new Color(193, 148, 135);
         private static readonly Color PanelBottomTrimColor = new Color(154, 115, 118);
         private static readonly Color InputBoxFillColor = new Color(49, 41, 56);
         private static readonly Color KeyFillColor = new Color(52, 83, 111);
@@ -144,8 +143,7 @@ namespace BillusBucket
             int faceFrame = (int)(sceneSeconds * 2f) % 7 == 0 ? 1 : 0;
             spriteBatch.Draw(burnedSprite, new Vector2(96, 10),
                 new Rectangle(faceFrame * 24 + 3, 0, 18, 18), Color.White);
-            DrawText("BUY BILLU CHAI!", new Vector2(118, 8), WarmTitleColor, 1);
-            DrawButton("BUY CHAI", roundFlow.SupportButton, isSupportButtonHovered);
+            DrawButton("BUY BILLU CHAI", roundFlow.SupportButton, isSupportButtonHovered);
 
             spriteBatch.Draw(uiSign, new Vector2(88f, 40f), Color.White);
             DrawCenteredCompactHeading("GAME OVER", 73, GameOverTitleColor);
@@ -176,7 +174,6 @@ namespace BillusBucket
             int innerX = bounds.X + 5;
             int innerWidth = bounds.Width - 10;
             DrawRect(innerX, bounds.Y + 4, innerWidth, 2, PanelTopTrimColor);
-            DrawRect(innerX + 6, bounds.Y + 5, Math.Min(14, Math.Max(0, innerWidth - 12)), 1, PanelTopGlintColor);
             DrawRect(innerX, bounds.Y + 7, innerWidth, Math.Max(1, bounds.Height - 13), PanelFaceColor);
             DrawRect(innerX + 2, bounds.Bottom - 5, Math.Max(0, innerWidth - 4), 1, PanelBottomTrimColor);
         }

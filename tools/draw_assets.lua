@@ -171,6 +171,8 @@ local function sideWalk(step,left)
  line(a,16,18,16,20,'gold')
  -- Close the scarf silhouette before turning, including the shirt edge behind it.
  rect(a,18,18,1,5,'ink')
+ -- The back edge is a continuous outline, without a detached shirt-colour strip.
+ line(a,8,19,8,22,'ink')
  px(a,9,17,'ink');px(a,8,18,'ink')
  if left then
   local turned=img(24,32)
@@ -269,7 +271,7 @@ for row=0,2 do for f=0,3 do
  local a=img(32,96)
  local body=row==0 and billu(false,f,false) or sideWalk(f,row==2)
  paste(a,body,4,12);paste(a,bucket,2,0)
- -- Lower atlas row exposes the full body for independent bucket impact.
+ -- Lower atlas row exposes the full body for drawing the bucket and stored paper separately.
  paste(a,body,4,60)
  carry[#carry+1]=a
 end end
@@ -569,7 +571,7 @@ poly(sign,{{4,16},{137,16},{140,19},{138,65},{135,67},{8,67},{4,64}},0x725661)
 rect(sign,6,18,132,2,0xad8080);rect(sign,6,21,132,42,0x514352)
 line(sign,9,65,132,65,0x9a7376)
 -- Unadorned panel face; no corner studs.
-line(sign,12,19,24,19,0xc19487);line(sign,118,64,130,64,0x725661)
+line(sign,118,64,130,64,0x725661)
 -- Keep the outer contour above all painted panels and trim.
 contour(sign,signEdge,'ink')
 saveFrames('ui-sign',{sign},144,78)

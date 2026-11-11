@@ -7,7 +7,7 @@ using System.Threading;
 namespace BillusBucket
 {
     /// <summary>
-    /// Shared weekly online leaderboard & cloud profile adapter backed by Cloudflare Workers + D1 (or Supabase).
+    /// Shared online leaderboard & cloud profile adapter backed by Cloudflare Workers + D1 (or Supabase).
     /// Always saves personal best and custom name locally first, syncs to the cloud,
     /// supports cross-device Save Codes, and degrades cleanly to local mode whenever offline.
     /// </summary>
@@ -46,7 +46,7 @@ namespace BillusBucket
             ILocalScoreStorage storage,
             ISharedLeaderboardTransport transport,
             string sourcePlatform = "web",
-            string providerName = "WEEKLY ONLINE")
+            string providerName = "ONLINE LEADERBOARD")
         {
             this.storage = storage ?? new InMemoryScoreStorage(reportPersistentAvailable: false);
             this.transport = transport ?? throw new ArgumentNullException(nameof(transport));
@@ -62,7 +62,7 @@ namespace BillusBucket
             personalBest = SafeLoadPersonalBest();
             CurrentSnapshot = new LeaderboardSnapshot(
                 personalBest: personalBest,
-                statusMessage: "WEEKLY TOP 10 READY");
+                statusMessage: "LEADERBOARD READY");
         }
 
         public async Task InitializeAsync()
@@ -177,8 +177,8 @@ namespace BillusBucket
                 weeklyTop10 = remote.Top10;
 
                 string message = weeklyTop10.Count > 0
-                    ? "WEEKLY TOP 10"
-                    : "NO WEEKLY SCORES YET";
+                    ? "LEADERBOARD"
+                    : "NO SCORES YET";
 
                 CurrentSnapshot = new LeaderboardSnapshot(
                     personalBest: personalBest,
@@ -290,7 +290,7 @@ namespace BillusBucket
                 currentWeeklyRank = remote.PlayerWeeklyRank;
                 weeklyTop10 = remote.Top10;
 
-                string status = weeklyTop10.Count > 0 ? "WEEKLY TOP 10" : "NO WEEKLY SCORES YET";
+                string status = weeklyTop10.Count > 0 ? "LEADERBOARD" : "NO SCORES YET";
                 CurrentSnapshot = new LeaderboardSnapshot(
                     personalBest: personalBest,
                     currentPlayerWeeklyRank: currentWeeklyRank,
@@ -388,7 +388,7 @@ namespace BillusBucket
             currentWeeklyRank = remote.PlayerWeeklyRank;
             weeklyTop10 = remote.Top10;
 
-            string status = weeklyTop10.Count > 0 ? "WEEKLY TOP 10" : "NO WEEKLY SCORES YET";
+            string status = weeklyTop10.Count > 0 ? "LEADERBOARD" : "NO SCORES YET";
             CurrentSnapshot = new LeaderboardSnapshot(
                 personalBest: personalBest,
                 currentPlayerWeeklyRank: currentWeeklyRank,
@@ -421,7 +421,7 @@ namespace BillusBucket
                 weeklyTop10: weeklyTop10,
                 isLoading: true,
                 isOnlineAvailable: isOnlineAvailable,
-                statusMessage: "LOADING WEEKLY TOP 10...");
+                statusMessage: "LOADING LEADERBOARD...");
 
             string requestedPlayerId = SafeGetPlayerId();
             SharedLeaderboardRemoteResponse remote = await CallTransportAsync(
@@ -441,8 +441,8 @@ namespace BillusBucket
                 weeklyTop10 = remote.Top10;
 
                 string status = weeklyTop10.Count > 0
-                    ? "WEEKLY TOP 10"
-                    : "NO WEEKLY SCORES YET";
+                    ? "LEADERBOARD"
+                    : "NO SCORES YET";
 
                 CurrentSnapshot = new LeaderboardSnapshot(
                     personalBest: personalBest,

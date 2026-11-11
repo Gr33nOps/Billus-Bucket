@@ -306,7 +306,7 @@ test("end-to-end D1 SQLite submission, deduplication, best-score retention, and 
     assert.equal(alphaSnapshot.playerRank, 12);
     assert.equal(alphaSnapshot.entries[0].score, "3100");
 
-    // 6. Advancing past Monday 09:00 UTC opens a fresh weekly board
+    // A new week must retain scores and ranks on the permanent leaderboard.
     nowMs = Date.parse("2026-11-02T09:00:01.000Z");
     const nextWeekRes = await handler(
       new Request(
@@ -316,9 +316,24 @@ test("end-to-end D1 SQLite submission, deduplication, best-score retention, and 
       env,
     );
     const nextWeekJson = await nextWeekRes.json();
-    assert.equal(nextWeekJson.weekStart, "2026-11-02T09:00:00.000Z");
-    assert.equal(nextWeekJson.entries.length, 0);
-    assert.equal(nextWeekJson.playerRank, null);
+    assert.equal(nextWeekJson.entries.length, 10);
+    assert.equal(nextWeekJson.playerRank, 12);
+    assert.equal(nextWeekJson.entries[0].score, "3100");
+    assert.equal(nextWeekJson.scope, "all-time");
+
+    const laterRun = async (score, runId) => {
+      const response = await submit({ playerId: "player-alpha-00000001", runId,
+        score, durationSeconds: 30, platform: "web" });
+      assert.equal(response.status, 200);
+      return response.json();
+    };
+    const lowerNextWeek = await laterRun("100", "run-next-week-lower-001");
+    assert.equal(lowerNextWeek.personalBest, "1500");
+    assert.equal(lowerNextWeek.playerRank, 12);
+    const higherNextWeek = await laterRun("5000", "run-next-week-higher-001");
+    assert.equal(higherNextWeek.playerRank, 1);
+    assert.equal(higherNextWeek.entries[0].score, "5000");
+    assert.equal(higherNextWeek.entries[1].score, "3100");
   } finally {
     db.close();
   }
@@ -596,6 +611,8 @@ test("duplicate labels are distinct, guests are clear, and snapshots are never c
       db.sqlite.prepare("INSERT INTO weekly_leaderboard_scores VALUES (?, ?, ?, ?, ?, ?)")
         .run(week, hash.repeat(64), name, score, stamp, "web");
     }
+    // Existing installations keep their archived scores when upgrading.
+    db.sqlite.exec(fs.readFileSync("backend/cloudflare/migrations/0003_all_time_leaderboard.sql", "utf8"));
     const handler = createCloudflareLeaderboardHandler(() => Date.parse(stamp));
     const response = await handler(new Request("https://lb.example/"), {DB:db, PLAYER_HASH_SALT:TEST_SALT});
     const snapshot = await response.json();
@@ -617,6 +634,30 @@ test("a stale device cannot rename the cloud profile by submitting a run", async
     const response = await post({playerId:"PLAYERONE1234",runId:"stale-device-run-0001",displayName:"OLD_NAME",score:"100",durationSeconds:10});
     assert.equal(response.status, 200);
     assert.equal((await response.json()).displayName, "NEW_NAME");
+  } finally { db.close(); }
+});
+
+test("all-time upgrade preserves custom profiles, higher bests, and every archive row", async () => {
+  const db = createD1SqliteMock();
+  try {
+    const stamp = "2026-10-30T12:00:00.000Z";
+    db.sqlite.prepare("INSERT INTO player_profiles (player_hash,display_name,all_time_best,source_platform,created_at,updated_at) VALUES (?,?,?,?,?,?)")
+      .run("a".repeat(64), "CUSTOM", 9000, "web", stamp, stamp);
+    for (const [week, id, score] of [
+      ["2026-10-19T09:00:00.000Z", "a", 4000],
+      ["2026-10-26T09:00:00.000Z", "a", 5000],
+      ["2026-10-19T09:00:00.000Z", "b", 7000],
+      ["2026-10-26T09:00:00.000Z", "b", 6000],
+    ]) db.sqlite.prepare("INSERT INTO weekly_leaderboard_scores VALUES (?,?,?,?,?,?)")
+      .run(week, id.repeat(64), "LEGACY", score, stamp, "web");
+    const migration = fs.readFileSync("backend/cloudflare/migrations/0003_all_time_leaderboard.sql", "utf8");
+    db.sqlite.exec(migration);
+    db.sqlite.exec(migration); // Reapplying an upgrade is safe.
+    const handler = createCloudflareLeaderboardHandler(() => Date.parse("2027-02-01T12:00:00.000Z"));
+    const response = await handler(new Request("https://lb.example/"), { DB: db, PLAYER_HASH_SALT: TEST_SALT });
+    const result = await response.json();
+    assert.deepEqual(result.entries.map(e => [e.displayName, e.score]), [["CUSTOM", "9000"], ["LEGACY", "7000"]]);
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) AS n FROM weekly_leaderboard_scores").get().n, 4);
   } finally { db.close(); }
 });
 
