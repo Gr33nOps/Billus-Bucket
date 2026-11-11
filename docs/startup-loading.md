@@ -1,6 +1,6 @@
 # Browser startup loading — 11 November 2026
 
-The game runs in the browser from static GitHub Pages files. The leaderboard is a separate service and was already initialized in the background. It does not need to finish connecting before play.
+The game runs in the browser from static files. The main host is now Cloudflare, with GitHub Pages retained as a mirror; see [hosting notes](game-hosting.md). The leaderboard is a separate service and was already initialized in the background. It does not need to finish connecting before play.
 
 ## Changes
 

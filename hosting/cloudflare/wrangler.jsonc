@@ -1,0 +1,14 @@
+{
+  "name": "billus-bucket",
+  "account_id": "76ea2ea5a8d42211bc27070e6db66d98",
+  "compatibility_date": "2026-11-11",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../../dist/cloudflare",
+    "not_found_handling": "none"
+  },
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true }
+  }
+}

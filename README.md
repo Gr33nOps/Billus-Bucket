@@ -1,6 +1,8 @@
 # Billu's Bucket
 
-[Play in your browser](https://gr33nops.github.io/Billus-Bucket/)
+[Play in your browser](https://billus-bucket.moooviez.workers.dev/)
+
+[GitHub Pages mirror](https://gr33nops.github.io/Billus-Bucket/)
 
 A crisp `320×180` pixel-art rooftop arcade game built with C# and MonoGame (DesktopGL + Browser WebAssembly via KNI BlazorGL).
 
@@ -40,6 +42,7 @@ dotnet run --project BillusBucket
 - `tools/deploy_cloudflare_leaderboard.ps1` — Cloudflare provisioning and migration/deployment helper
 - `backend/supabase/` — Optional shared weekly Top-10 leaderboard Postgres schema (`schema.sql`) and Edge Function (`functions/leaderboard/index.ts`)
 - `tools/publish_web.ps1` — Builds portal-specific static WebAssembly bundles (`local`, `web`, `crazygames`, `poki`)
+- `hosting/cloudflare/` and `tools/deploy_cloudflare_game.ps1` — Static Cloudflare game host and its publish command; see [hosting notes](docs/game-hosting.md)
 - `docs/browser-and-leaderboards.md` — Full guide for platform configuration, optional Supabase setup, security risks, and CrazyGames/Poki submission checklists
 
 ## Quick Commands

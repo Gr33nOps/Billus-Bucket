@@ -136,6 +136,22 @@ test("rate-limit database errors fail closed with 503", async () => {
   assert.equal(postRes.status, 503);
 });
 
+test("production CORS permits both game hosts and still rejects unrelated websites", async () => {
+  const config = JSON.parse(fs.readFileSync("backend/cloudflare/wrangler.jsonc", "utf8"));
+  const handler = createCloudflareLeaderboardHandler();
+  const env = { ALLOWED_ORIGINS: config.vars.ALLOWED_ORIGINS };
+  for (const origin of ["https://gr33nops.github.io", "https://billus-bucket.moooviez.workers.dev"]) {
+    const response = await handler(new Request("https://lb.example.workers.dev", {
+      method: "OPTIONS", headers: { Origin: origin }
+    }), env);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), origin);
+  }
+  const denied = await handler(new Request("https://lb.example.workers.dev", {
+    method: "OPTIONS", headers: { Origin: "https://unrelated.example" }
+  }), env);
+  assert.equal(denied.headers.get("Access-Control-Allow-Origin"), "null");
+});
+
 test("CORS origin allowlist blocks unauthorized browser origins", async () => {
   const db = createD1SqliteMock();
   try {

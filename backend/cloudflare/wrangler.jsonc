@@ -3,7 +3,7 @@
   "main": "src/index.mjs",
   "compatibility_date": "2026-10-01",
   "vars": {
-    "ALLOWED_ORIGINS": "https://gr33nops.github.io,http://127.0.0.1:5099,http://localhost:5099"
+    "ALLOWED_ORIGINS": "https://gr33nops.github.io,https://billus-bucket.moooviez.workers.dev,http://127.0.0.1:5099,http://localhost:5099"
   },
   "d1_databases": [
     {
