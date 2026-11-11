@@ -139,8 +139,16 @@ namespace BillusBucket
 
         private void DrawGameOverScreen()
         {
-            spriteBatch.Draw(uiSign, new Vector2(88f, 28f), Color.White);
-            DrawPanelHeading(GameOverTitleColor, "GAME OVER");
+            // A small support panel above the game-over sign, using the existing crying sprite.
+            DrawTimberPanel(new Rectangle(88, 2, 144, 34));
+            int faceFrame = (int)(sceneSeconds * 2f) % 7 == 0 ? 1 : 0;
+            spriteBatch.Draw(burnedSprite, new Vector2(96, 10),
+                new Rectangle(faceFrame * 24 + 3, 0, 18, 18), Color.White);
+            DrawText("BUY BILLU CHAI!", new Vector2(118, 8), WarmTitleColor, 1);
+            DrawButton("BUY CHAI", roundFlow.SupportButton, isSupportButtonHovered);
+
+            spriteBatch.Draw(uiSign, new Vector2(88f, 40f), Color.White);
+            DrawCenteredCompactHeading("GAME OVER", 73, GameOverTitleColor);
             DrawButton("RETRY", roundFlow.MainButton, isMainButtonHovered);
         }
 

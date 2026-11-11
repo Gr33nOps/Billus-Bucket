@@ -59,6 +59,9 @@ namespace BillusBucket
 
         string LoadAudioPreferences() => null;
         void SaveAudioPreferences(string value) { }
+        // Screen-pixel bounds let the browser place a real link over the drawn support button.
+        void SetSupportButton(ButtonBounds screenBounds) { }
+        void OpenSupportPage() { }
         Task InitializeAsync();
         void NotifyLoadingStarted();
         void NotifyLoadingFinished();
@@ -112,6 +115,21 @@ namespace BillusBucket
         public void NotifyLoadingFinished() { }
         public void NotifyGameplayStart() { }
         public void NotifyGameplayStop() { }
+
+        public void OpenSupportPage()
+        {
+#if !BLAZORGL
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                    "https://ko-fi.com/zain021xd") { UseShellExecute = true });
+            }
+            catch (Exception error)
+            {
+                System.Diagnostics.Debug.WriteLine("Could not open support page: " + error.Message);
+            }
+#endif
+        }
     }
 
     /// <summary>
@@ -140,6 +158,8 @@ namespace BillusBucket
 
         public string LoadAudioPreferences() => inner.LoadAudioPreferences();
         public void SaveAudioPreferences(string value) => inner.SaveAudioPreferences(value);
+        public void SetSupportButton(ButtonBounds screenBounds) => inner.SetSupportButton(screenBounds);
+        public void OpenSupportPage() => inner.OpenSupportPage();
 
         public Task InitializeAsync()
         {

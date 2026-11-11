@@ -114,6 +114,16 @@ namespace BillusBucket.Web
             InvokeFireAndForget("billuPlatform.notifyLoadingStarted");
         }
 
+        public void SetSupportButton(ButtonBounds screenBounds)
+        {
+            try
+            {
+                jsInProcess?.InvokeVoid("billuPlatform.setSupportButton",
+                    screenBounds.X, screenBounds.Y, screenBounds.Width, screenBounds.Height);
+            }
+            catch { }
+        }
+
         public void NotifyLoadingFinished()
         {
             InvokeFireAndForget("billuPlatform.notifyLoadingFinished");

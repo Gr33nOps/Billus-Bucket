@@ -23,6 +23,7 @@ namespace GameTests
             TestDropDirector();
             TestIndependentCashSpawns();
             TestRoundFlow();
+            TestChaiSupportButton();
             TestRoundFlowLeaderboardRules();
             TestBilluAnimator();
             TestDropMotion();
@@ -216,6 +217,27 @@ namespace GameTests
             }
 
             Equal(true, bombs > 100, "long runs still contain hazards");
+        }
+
+        private static void TestChaiSupportButton()
+        {
+            var flow = new RoundFlow();
+            Equal(false, flow.SupportButton.Contains(150, 25), "support link is hidden on ready screen");
+            flow.ActivateMainAction();
+            Equal(false, flow.SupportButton.Contains(150, 25), "support link is hidden during play");
+            flow.TogglePause();
+            Equal(false, flow.SupportButton.Contains(150, 25), "support link is hidden while paused");
+            flow.TogglePause();
+            flow.HitBomb();
+            Equal(true, flow.SupportButton.Contains(150, 25), "game over exposes chai support button");
+            Equal(RoundAction.None, flow.TryMainActionAt(150, 25), "chai click does not restart the run");
+            Equal(false, flow.MainButton.Contains(150, 25), "support and retry buttons do not overlap");
+            flow.OpenLeaderboard();
+            Equal(false, flow.SupportButton.Contains(150, 25), "leaderboard hides the support link");
+            flow.CloseLeaderboard();
+            Equal(true, flow.SupportButton.Contains(150, 25), "returning to game over restores support");
+            flow.ActivateMainAction();
+            Equal(false, flow.SupportButton.Contains(150, 25), "retry hides support");
         }
 
         private static void TestRoundFlow()

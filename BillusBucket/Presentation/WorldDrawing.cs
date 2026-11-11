@@ -47,6 +47,20 @@ namespace BillusBucket
 
             // 3. Scale the 320x180 canvas crisply to a centered 16:9 viewport with nearest-neighbor filtering.
             Rectangle destination = GetCanvasDestinationRect();
+            // Match the browser's real anchor to the button on the scaled game canvas.
+            ButtonBounds support = roundFlow.SupportButton;
+            if (support.Width > 0 && explosionCountdown <= 0f)
+            {
+                int left = destination.X + support.X * destination.Width / PixelArt.FieldWidth;
+                int top = destination.Y + support.Y * destination.Height / PixelArt.Height;
+                int right = destination.X + (support.X + support.Width) * destination.Width / PixelArt.FieldWidth;
+                int bottom = destination.Y + (support.Y + support.Height) * destination.Height / PixelArt.Height;
+                platformBridge.SetSupportButton(new ButtonBounds(left, top, right - left, bottom - top));
+            }
+            else
+            {
+                platformBridge.SetSupportButton(default);
+            }
             GraphicsDevice.Clear(Color.Black);
             GraphicsDevice.ScissorRectangle = destination;
             Matrix skyTransform = Matrix.CreateScale(destination.Width / 320f, destination.Height / 180f, 1f) * Matrix.CreateTranslation(destination.X, destination.Y, 0f);

@@ -23,6 +23,7 @@ namespace BillusBucket
         private bool previousTouch;
         private bool ignorePointerUntilRelease;
         private bool isMainButtonHovered;
+        private bool isSupportButtonHovered;
 
         // Mute flags are stored here so the UI buttons still toggle when no audio hardware is present.
         private bool musicMuted;
@@ -45,6 +46,7 @@ namespace BillusBucket
         private void ClearHoverStates()
         {
             isMainButtonHovered = false;
+            isSupportButtonHovered = false;
             isLeaderboardButtonHovered = false;
             isBackButtonHovered = false;
             isLeaderboardNameHovered = false;
@@ -67,6 +69,8 @@ namespace BillusBucket
 
             Point mouseCanvas = ScreenToCanvas(mouse.X, mouse.Y, canvasViewport);
             isMainButtonHovered = roundFlow.MainButton.Contains(mouseCanvas.X, mouseCanvas.Y);
+            isSupportButtonHovered = explosionCountdown <= 0f &&
+                roundFlow.SupportButton.Contains(mouseCanvas.X, mouseCanvas.Y);
             bool canUseLeaderboardIcon = roundFlow.IsLeaderboardOpen || CurrentPhase == RoundPhase.Ready || (CurrentPhase == RoundPhase.GameOver && explosionCountdown <= 0f);
             isLeaderboardButtonHovered = canUseLeaderboardIcon && LeaderboardIconButton.Contains(mouseCanvas.X, mouseCanvas.Y);
             if (!roundFlow.IsLeaderboardOpen)
@@ -140,6 +144,12 @@ namespace BillusBucket
             if (clicked)
             {
                 Point canvasPoint = ScreenToCanvas(mouse.X, mouse.Y, canvasViewport);
+                if (roundFlow.SupportButton.Contains(canvasPoint.X, canvasPoint.Y))
+                {
+                    platformBridge.OpenSupportPage();
+                    ignorePointerUntilRelease = true;
+                    return RoundAction.None;
+                }
                 RoundAction action = roundFlow.TryMainActionAt(canvasPoint.X, canvasPoint.Y);
                 if (action != RoundAction.None)
                 {
@@ -152,6 +162,12 @@ namespace BillusBucket
             if (tapped)
             {
                 Point canvasPoint = ScreenToCanvas(touch[0].Position.X, touch[0].Position.Y, canvasViewport);
+                if (roundFlow.SupportButton.Contains(canvasPoint.X, canvasPoint.Y))
+                {
+                    platformBridge.OpenSupportPage();
+                    ignorePointerUntilRelease = true;
+                    return RoundAction.None;
+                }
                 RoundAction action = roundFlow.TryMainActionAt(canvasPoint.X, canvasPoint.Y);
                 if (action != RoundAction.None)
                 {

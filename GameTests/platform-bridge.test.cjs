@@ -12,6 +12,7 @@ function setup(view = null) {
   const error = { style: { display: "none" } };
   const overlay = { style: { display: "block" } };
   const canvas = { width: 0, height: 0, style: {}, addEventListener() {}, focus() {} };
+  const elements = [];
   const holder = {
     style: {},
     clientWidth: view?.width,
@@ -69,6 +70,12 @@ function setup(view = null) {
       location: { hostname: "localhost" },
     },
     document: {
+      body: { appendChild(element) { elements.push(element); } },
+      createElement(tagName) {
+        return { tagName, style: {}, events: {},
+          addEventListener(name, handler) { this.events[name] = handler; },
+          setAttribute(name, value) { this[name] = value; } };
+      },
       documentElement: { style: { setProperty() {} } },
       addEventListener(name, handler) { (documentEvents[name] ||= []).push(handler); },
       getElementById(id) {
@@ -102,6 +109,7 @@ function setup(view = null) {
     error,
     overlay,
     canvas,
+    elements,
     getCopiedText: () => copiedClipboardText,
     setRejectWrites(value) { rejectWrites = value; },
     setHidden(value) { context.document.hidden = value; for (const f of documentEvents.visibilitychange || []) f(); },
@@ -116,6 +124,32 @@ function setup(view = null) {
     },
   };
 }
+test("chai link opens the supplied Ko-fi page through an accessible native link only when visible", () => {
+  const s = setup({ width: 1280, height: 720 });
+  s.api.setSupportButton(0, 0, 0, 0);
+  assert.equal(s.elements.length, 0, "no link is created during normal play");
+  s.api.setSupportButton(472, 68, 416, 72);
+  const link = s.elements[0];
+  assert.equal(link.tagName, "a");
+  assert.equal(link.href, "https://ko-fi.com/zain021xd");
+  assert.equal(link.target, "_blank");
+  assert.equal(link.rel, "noopener noreferrer");
+  assert.equal(link["aria-label"], "Buy Billu chai on Ko-fi (opens in a new tab)");
+  assert.equal(link.style.left, "472px");
+  assert.equal(link.style.top, "68px");
+  assert.equal(link.style.width, "416px");
+  assert.equal(link.style.height, "72px");
+  let stopped = 0;
+  link.events.touchstart({ stopPropagation() { stopped++; } });
+  link.events.touchend({ stopPropagation() { stopped++; } });
+  assert.equal(stopped, 2, "link touches must not reach KNI's page-level default cancellation");
+  s.api.setSupportButton(0, 0, 0, 0);
+  assert.equal(link.hidden, true, "retry or a modal hides the link");
+  s.api.setSupportButton(10, 20, 100, 30);
+  assert.equal(s.elements.length, 1, "reuse one link across frames and runs");
+  assert.equal(link.hidden, false);
+  assert.equal(link.style.left, "10px");
+});
 test("fatal game exception stops rendering and displays reload UI", () => {
   const s = setup();
   s.api.startRenderLoop({

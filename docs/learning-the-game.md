@@ -168,8 +168,11 @@ The bit operations in `DropMotion.WindVelocity` make repeatable random choices f
 | How does a touch become a game position? | `Game/Input.cs`: `ScreenToCanvasFloatX`. |
 | Where are day and night timings? | `SkyMotion.NightAmount`; colors and lighting are in `WorldDrawing.cs`. |
 | Where is the pixel font? | `Presentation/PixelFont.cs`. |
+| Where is the game-over chai panel? | `InterfaceDrawing.DrawGameOverScreen`; `RoundFlow.SupportButton` holds its button bounds. |
 
 For a first debugging session, place a breakpoint in `HandleCashCaught` and catch one note. Inspect `drop.Value`, then step into `CatchCash` to watch `Cash` and `BestCash` change.
+
+The chai button uses the existing burned character sprite. Desktop opens the support URL through the operating system. In the browser, the platform bridge places a transparent native link over the drawn button, matching the scaled canvas coordinates. This keeps opening a new tab inside the player's click or tap, including on mobile.
 
 ## Check your understanding
 

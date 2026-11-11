@@ -12,6 +12,38 @@
     let crazyGamesReady = false;
     let crazyGamesEnvironment = "disabled";
     let pokiReady = false;
+    let supportLink = null;
+
+    // A native link keeps mobile taps and keyboard activation inside a browser user gesture.
+    // Opening a window later from the render loop can be blocked by mobile browsers.
+    function setSupportButton(x, y, width, height) {
+        if (width <= 0 || height <= 0) {
+            if (supportLink) supportLink.hidden = true;
+            return;
+        }
+        if (!supportLink) {
+            supportLink = document.createElement("a");
+            supportLink.id = "chaiSupportLink";
+            supportLink.href = "https://ko-fi.com/zain021xd";
+            supportLink.target = "_blank";
+            supportLink.rel = "noopener noreferrer";
+            supportLink.setAttribute("aria-label", "Buy Billu chai on Ko-fi (opens in a new tab)");
+            supportLink.style.position = "fixed";
+            supportLink.style.zIndex = "10";
+            supportLink.style.cursor = "pointer";
+            supportLink.style.borderRadius = "0";
+            // KNI listens for touch events on the page and cancels their default action.
+            // Keep link touches local so the browser can follow the anchor normally.
+            supportLink.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
+            supportLink.addEventListener("touchend", event => event.stopPropagation(), { passive: true });
+            document.body.appendChild(supportLink);
+        }
+        supportLink.hidden = false;
+        supportLink.style.left = x + "px";
+        supportLink.style.top = y + "px";
+        supportLink.style.width = width + "px";
+        supportLink.style.height = height + "px";
+    }
 
     function isLocalhost() {
         const host = (window.location && window.location.hostname) || "";
@@ -571,6 +603,7 @@
     }, { passive: false });
 
     window.billuPlatform = {
+        setSupportButton: setSupportButton,
         initializePlatform: initializePlatform,
         startBrowserGame: startBrowserGame,
         notifyLoadingStarted: notifyLoadingStarted,
