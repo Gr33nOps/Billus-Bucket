@@ -10,7 +10,10 @@
     <DefineConstants>$(DefineConstants);BLAZORGL</DefineConstants>
     <KniPlatform>BlazorGL</KniPlatform>
     <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
-    <PublishTrimmed>false</PublishTrimmed>
+    <PublishTrimmed>true</PublishTrimmed>
+    <!-- Trim unused framework libraries; preserve unannotated game/engine code and its JS callbacks. -->
+    <TrimMode>partial</TrimMode>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>

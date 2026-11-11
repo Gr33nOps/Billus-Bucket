@@ -16,6 +16,7 @@ namespace GameTests
         {
             TestAudioPreferences();
             TestResourceDownloads();
+            TestBackgroundAssetAvailability();
             TestCatchSweeps();
             TestNoteCatalog();
             TestRunScoring();
@@ -71,6 +72,17 @@ namespace GameTests
                 Equal("10", reloaded.LoadAudioPreferences(), "audio settings survive a desktop restart");
             }
             finally { File.Delete(path); }
+        }
+
+        private static void TestBackgroundAssetAvailability()
+        {
+            var provider = new InMemoryAssetStreamProvider();
+            Equal(false, provider.IsAvailable("Audio/catch.wav"), "sound can be absent while the game starts");
+            provider.Add("Audio/catch.wav", new byte[] { 1, 2, 3 });
+            Equal(true, provider.IsAvailable("Audio/catch.wav"), "background sound becomes available without restarting");
+            Equal(true, provider.IsAvailable("Audio\\catch.wav"), "availability uses the same normalized paths as reads");
+            using var stream = provider.OpenRead("Audio/catch.wav");
+            Equal(3L, stream.Length, "late sound bytes are readable");
         }
 
         private static void TestResourceDownloads()

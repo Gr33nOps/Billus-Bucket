@@ -49,6 +49,8 @@ namespace BillusBucket.Web.Pages
                 bootCompleted = true;
 
                 await JsRuntime.InvokeVoidAsync("billuPlatform.startRenderLoop", dotNetRef);
+                // Optional audio must never hold the ready screen behind the loader.
+                _ = LoadAudioInBackgroundAsync();
             }
             catch (Exception error)
             {
@@ -91,18 +93,17 @@ namespace BillusBucket.Web.Pages
             string[] assetPaths = InMemoryAssetStreamProvider.RequiredAssets;
             Task<byte[]>[] downloads = new Task<byte[]>[assetPaths.Length];
             string assetVersion = await JsRuntime.InvokeAsync<string>("billuPlatform.getAssetVersion");
-            // The pixel art is tiny. A per-load image revision avoids stale character
-            // sprites during the GitHub Pages cache window without reloading large WAVs.
-            string imageRevision = Guid.NewGuid().ToString("N");
-
             for (int i = 0; i < assetPaths.Length; i++)
             {
-                string revision = assetPaths[i].EndsWith(".png", StringComparison.OrdinalIgnoreCase)
-                    ? assetVersion + "-" + imageRevision
-                    : assetVersion;
+                if (assetPaths[i].EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                {
+                    downloads[i] = Task.FromResult<byte[]>(null);
+                    continue;
+                }
+
+                // A stable build version refreshes updated art while allowing repeat visits to cache it.
                 downloads[i] = GameAssetDownload.FetchAsync(Http,
-                    "Assets/" + assetPaths[i] + "?v=" + Uri.EscapeDataString(revision),
-                    optional: assetPaths[i].EndsWith(".wav", StringComparison.OrdinalIgnoreCase),
+                    "Assets/" + assetPaths[i] + "?v=" + Uri.EscapeDataString(assetVersion),
                     cancellationToken: preloadCancellation.Token);
             }
 
@@ -114,6 +115,39 @@ namespace BillusBucket.Web.Pages
             }
 
             return provider;
+        }
+
+        private async Task LoadAudioInBackgroundAsync()
+        {
+            try
+            {
+                string version = await JsRuntime.InvokeAsync<string>("billuPlatform.getAssetVersion");
+                var downloads = new System.Collections.Generic.List<Task>();
+                foreach (string path in InMemoryAssetStreamProvider.RequiredAssets)
+                {
+                    if (path.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                    {
+                        downloads.Add(DownloadSoundAsync(path, version));
+                    }
+                }
+                await Task.WhenAll(downloads);
+            }
+            catch (OperationCanceledException) { } // Closing the page cancels outstanding downloads.
+            catch (Exception error)
+            {
+                System.Diagnostics.Debug.WriteLine("Background audio skipped: " + error.Message);
+            }
+        }
+
+        private async Task DownloadSoundAsync(string path, string version)
+        {
+            byte[] bytes = await GameAssetDownload.FetchAsync(Http,
+                "Assets/" + path + "?v=" + Uri.EscapeDataString(version),
+                optional: true, cancellationToken: preloadCancellation.Token);
+            if (!disposed && bytes != null)
+            {
+                preloadedAssets.Add(path, bytes);
+            }
         }
 
         public void Dispose()

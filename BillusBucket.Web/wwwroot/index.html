@@ -34,22 +34,23 @@
         <a href="" class="reload" style="color:#f0d398;margin-left:8px;">RELOAD</a>
     </div>
 
-    <script src="platform-config.js?v=__BILLU_ASSET_VERSION__"></script>
-    <script src="js/platform-bridge.js?v=__BILLU_ASSET_VERSION__"></script>
+    <!-- Download engine scripts together; defer preserves their execution order before window.load. -->
+    <script defer src="platform-config.js?v=__BILLU_ASSET_VERSION__"></script>
+    <script defer src="js/platform-bridge.js?v=__BILLU_ASSET_VERSION__"></script>
 
-    <script src="_content/nkast.Wasm.JSInterop/js/JSObject.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.Dom/js/Window.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.Dom/js/Document.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.Dom/js/Navigator.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.Dom/js/Gamepad.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.Dom/js/Media.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.XHR/js/XHR.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.Canvas/js/Canvas.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.Canvas/js/CanvasGLContext.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.Audio/js/Audio.10.0.3.js"></script>
-    <script src="_content/nkast.Wasm.XR/js/XR.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.JSInterop/js/JSObject.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.Dom/js/Window.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.Dom/js/Document.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.Dom/js/Navigator.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.Dom/js/Gamepad.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.Dom/js/Media.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.XHR/js/XHR.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.Canvas/js/Canvas.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.Canvas/js/CanvasGLContext.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.Audio/js/Audio.10.0.3.js"></script>
+    <script defer src="_content/nkast.Wasm.XR/js/XR.10.0.3.js"></script>
 
-    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    <script defer src="_framework/blazor.webassembly.js" autostart="false"></script>
 </body>
 
 </html>

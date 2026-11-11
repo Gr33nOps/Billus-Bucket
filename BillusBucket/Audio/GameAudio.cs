@@ -43,6 +43,8 @@ namespace BillusBucket
 
         private readonly Dictionary<string, SoundEffect> effects = new Dictionary<string, SoundEffect>();
         private readonly List<SoundEffectInstance> voices = new List<SoundEffectInstance>();
+        private readonly IAssetStreamProvider assetProvider;
+        private readonly HashSet<string> attemptedSounds = new HashSet<string>();
         private SoundEffectInstance music;
         private float currentMusicVolume;
         private float sadDelay = -1f;
@@ -54,35 +56,43 @@ namespace BillusBucket
 
         public GameAudio(IAssetStreamProvider assetProvider = null)
         {
-            IAssetStreamProvider provider = assetProvider ?? new DesktopAssetStreamProvider();
+            this.assetProvider = assetProvider ?? new DesktopAssetStreamProvider();
             try
             {
-                foreach (string name in AllSoundNames)
-                {
-                    try
-                    {
-                        using Stream stream = provider.OpenRead("Audio/" + name + ".wav");
-                        effects[name] = SoundEffect.FromStream(stream);
-                    }
-                    catch (NoAudioHardwareException) { throw; }
-                    catch (Exception error)
-                    {
-                        System.Diagnostics.Debug.WriteLine("Optional sound unavailable: " + name + " " + error.Message);
-                    }
-                }
-
-                if (effects.TryGetValue(MusicLoopName, out SoundEffect loop))
-                {
-                    music = loop.CreateInstance();
-                    music.IsLooped = true;
-                    music.Volume = 0f;
-                    TryEnsureMusicPlaying();
-                }
+                LoadAvailableSounds();
             }
             catch
             {
                 Dispose();
                 throw;
+            }
+        }
+
+        private void LoadAvailableSounds()
+        {
+            if (attemptedSounds.Count == AllSoundNames.Length) return;
+            foreach (string name in AllSoundNames)
+            {
+                string path = "Audio/" + name + ".wav";
+                if (attemptedSounds.Contains(name) || !assetProvider.IsAvailable(path)) continue;
+                attemptedSounds.Add(name);
+                try
+                {
+                    using Stream stream = assetProvider.OpenRead(path);
+                    effects[name] = SoundEffect.FromStream(stream);
+                    if (name == MusicLoopName)
+                    {
+                        music = effects[name].CreateInstance();
+                        music.IsLooped = true;
+                        music.Volume = 0f;
+                        TryEnsureMusicPlaying();
+                    }
+                }
+                catch (Exception error)
+                {
+                    // Missing hardware or an optional sound cannot interrupt the game loop.
+                    System.Diagnostics.Debug.WriteLine("Optional sound unavailable: " + name + " " + error.Message);
+                }
             }
         }
 
@@ -188,6 +198,9 @@ namespace BillusBucket
         {
             externallyMuted = isExternallyMuted;
             if (isDisposed) return;
+
+            // Web downloads finish independently. Pick up each sound once when its bytes arrive.
+            LoadAvailableSounds();
 
             bool canPlayAudio = isWindowActive && !isExternallyMuted;
             if (!canPlayAudio) StopVoices();

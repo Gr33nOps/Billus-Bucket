@@ -11,6 +11,8 @@ namespace BillusBucket
     public interface IAssetStreamProvider
     {
         Stream OpenRead(string relativeAssetPath);
+        // Desktop files are ready immediately; web audio can arrive after the first frame.
+        bool IsAvailable(string relativeAssetPath) => true;
     }
 
     public sealed class DesktopAssetStreamProvider : IAssetStreamProvider
@@ -78,6 +80,8 @@ namespace BillusBucket
 
             assets[NormalizeKey(relativeAssetPath)] = data ?? throw new ArgumentNullException(nameof(data));
         }
+
+        public bool IsAvailable(string relativeAssetPath) => assets.ContainsKey(NormalizeKey(relativeAssetPath));
 
         public Stream OpenRead(string relativeAssetPath)
         {

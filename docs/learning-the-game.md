@@ -51,6 +51,8 @@ BillusBucket/
 
 `BillusBucket.Web/`, `backend/`, and the deployment tools support the website and online scores. You can leave them until you want to study those features.
 
+The browser downloads the graphics before starting play and loads sound files in the background. `IAssetStreamProvider.IsAvailable` tells `GameAudio` when a sound has arrived, so it can start using it without reloading the game. See [startup loading](startup-loading.md) for the browser details.
+
 ## Why several files say `partial class BillusBucketGame`
 
 `partial` means **one class written across several files**. C# combines those pieces when it builds the game. There is still one `BillusBucketGame` object.

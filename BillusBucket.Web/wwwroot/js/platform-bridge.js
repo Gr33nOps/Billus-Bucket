@@ -480,7 +480,9 @@
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 15000);
             try {
-                const response = await fetch(uri, {integrity: integrity || "", cache: "no-cache", signal: controller.signal});
+                // Hashed runtime filenames are immutable. Only unversioned manifests need revalidation.
+                const fingerprinted = /\.[a-z0-9]{8,}\.(wasm|dat|js)(?:\?|$)/i.test(uri);
+                const response = await fetch(uri, {integrity: integrity || "", cache: fingerprinted ? "force-cache" : "no-cache", signal: controller.signal});
                 if (response.ok) return response;
                 if (response.status !== 429 && response.status < 500) {
                     throw Object.assign(new Error("Game file unavailable: HTTP " + response.status), {permanent:true});

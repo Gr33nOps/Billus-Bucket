@@ -150,6 +150,22 @@ test("chai link opens the supplied Ko-fi page through an accessible native link 
   assert.equal(link.hidden, false);
   assert.equal(link.style.left, "10px");
 });
+
+test("fingerprinted runtime downloads reuse cache while the boot manifest stays fresh", async () => {
+  const s = setup();
+  const requests = [];
+  s.setFetch(async (uri, options) => {
+    requests.push({ uri, cache: options.cache });
+    return { ok: true };
+  });
+  s.setBlazor({ start: async options => {
+    await options.loadBootResource("assembly", "System.Runtime.abcdefghij.wasm", "_framework/System.Runtime.abcdefghij.wasm", "");
+    await options.loadBootResource("manifest", "blazor.boot.json", "_framework/blazor.boot.json", "");
+  }});
+  await s.api.startBrowserGame();
+  assert.equal(requests[0].cache, "force-cache", "content hashes already identify immutable runtime versions");
+  assert.equal(requests[1].cache, "no-cache", "an unversioned boot manifest must revalidate");
+});
 test("fatal game exception stops rendering and displays reload UI", () => {
   const s = setup();
   s.api.startRenderLoop({
